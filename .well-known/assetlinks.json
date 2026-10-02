@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.manasatech.vaishnopearl",
+      "sha256_cert_fingerprints": [
+        "BF:6B:B6:34:23:F3:3E:47:6E:AE:1A:6E:A9:DA:A0:8E:59:EA:FA:94:56:44:A8:1E:26:22:55:62:CE:DF:48:50"
+      ]
+    }
+  }
+]
