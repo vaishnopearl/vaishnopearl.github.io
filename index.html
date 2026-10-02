@@ -389,6 +389,22 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--P);box-s
   body{background:#fff}
   .card,.met,.frow,.erow,.rem-row,.q-row,.doc-row,.litem,.chip,.mbar,.cfrow{box-shadow:none}
 }
+
+/* ===== v60.2 hamburger menu ===== */
+.tabbar{display:none!important}
+.vp-menubar{position:sticky;top:0;z-index:31;display:flex;align-items:center;gap:12px;background:var(--white);border-bottom:1px solid var(--bdr);padding:8px 14px;box-shadow:0 2px 8px rgba(12,30,60,.06)}
+.vp-hamb{width:42px;height:42px;flex-shrink:0;border-radius:11px;border:1px solid var(--bdr);background:var(--PL);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:0}
+.vp-hamb i{display:block;width:20px;height:2.5px;background:var(--P);border-radius:2px}
+.vp-cur{font-weight:800;color:var(--P);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vp-scrim{display:none;position:fixed;inset:0;background:rgba(5,15,35,.5);z-index:1000}
+body.vp-menu-open{overflow:hidden}
+body.vp-menu-open .vp-scrim{display:block}
+body.vp-menu-open .tabbar:not(.hidden){display:flex!important;position:fixed;top:0;left:0;bottom:0;width:min(80vw,300px);max-height:none;flex-direction:column;flex-wrap:nowrap;overflow-y:auto;z-index:1001;padding:0 0 24px;border:none;border-right:2px solid var(--gold);box-shadow:6px 0 24px rgba(0,0,0,.3);animation:vpSlide .2s ease-out}
+body.vp-menu-open .tabbar::before{content:'☰  Menu';display:block;position:sticky;top:0;background:var(--grad);color:#fff;font-weight:800;font-size:16px;padding:18px 18px 16px;border-bottom:2px solid var(--gold);z-index:1}
+body.vp-menu-open .tabbar .tab{width:100%;text-align:left;font-size:14.5px;padding:13px 18px;border-bottom:1px solid var(--bdr);border-left:4px solid transparent;white-space:normal}
+body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(--PL);border-bottom-color:var(--bdr)}
+@keyframes vpSlide{from{transform:translateX(-100%)}to{transform:none}}
+@media print{.vp-menubar,.vp-scrim{display:none!important}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -523,6 +539,8 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--P);box-s
     <button class="rbadge" id="rbadge" onclick="logoutConfirm()">👤 Admin</button>
   </div>
 </div>
+<div class="vp-menubar"><button class="vp-hamb" type="button" aria-label="Open menu" onclick="vpOpenMenu()"><i></i><i></i><i></i></button><span class="vp-cur" id="vp-cur">📊 Dashboard</span></div>
+<div class="vp-scrim" onclick="vpCloseMenu()"></div>
 <div class="hidden" id="offline-banner" style="background:#7c2d12;color:#fff;text-align:center;font-size:12px;font-weight:700;padding:7px 10px;position:sticky;top:0;z-index:40">
   📴 You're offline — your changes are saved on this phone and will sync automatically once you're back online
 </div>
@@ -4384,7 +4402,16 @@ function startCloudLive(){
     }
     vpSetLastStamp(d.updatedAt);
     vpSetCloudBadge('☁️ updated from '+(d.updatedBy||'cloud')+' ✓','var(--P)');
-    setTimeout(function(){location.reload();},500);
+    // v60.1: refresh in place instead of reloading, so a cloud update never logs the user out
+    setTimeout(function(){
+      var loggedIn=!!(currentRole||ownerFlat);
+      try{
+        st=load();FD=st.flatDirectory;
+        if(loggedIn){launch();}else{try{rLoginCommittee();}catch(e3){}}
+      }catch(e2){vpApplyingRemote=false;location.reload();return;}
+      vpApplyingRemote=false;
+      try{if(localStorage.getItem('vp_needs_repush')==='1'){localStorage.removeItem('vp_needs_repush');autoPush();}}catch(e4){}
+    },300);
   },function(err){vpSetCloudBadge('☁️ sync error','var(--err)');vpFirstSnap=false;});
 }
 function showToast(msg,ms=2400){
@@ -9784,4 +9811,24 @@ document.addEventListener('visibilitychange',function(){
 </script>
 <script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('gone');},11800);</script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+<script>
+/* v60.2 hamburger menu */
+function vpOpenMenu(){document.body.classList.add('vp-menu-open');var t=document.querySelector('.tabbar:not(.hidden) .tab.on');if(t)try{t.scrollIntoView({block:'center'});}catch(e){}}
+function vpCloseMenu(){document.body.classList.remove('vp-menu-open');}
+(function(){
+  var _orig=goTab;
+  goTab=function(id,btn){
+    var r=_orig.apply(this,arguments);
+    try{
+      var b=btn||document.querySelector('.tabbar:not(.hidden) .tab.on');
+      var el=document.getElementById('vp-cur');
+      if(el&&b)el.textContent=(b.textContent||'').replace(/\s+/g,' ').trim();
+    }catch(e){}
+    vpCloseMenu();
+    try{window.scrollTo(0,0);}catch(e){}
+    return r;
+  };
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')vpCloseMenu();});
+})();
+</script>
 </body></html>
