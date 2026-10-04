@@ -1,0 +1,4 @@
+
+# Signing credentials (keep locally, never commit)
+signing.keystore
+signing-key-info.txt
