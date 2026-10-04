@@ -4,3 +4,5 @@ signing.keystore
 signing-key-info.txt
 signing-keystore-original.keystore
 signing-key-info-original.txt
+signing-keystore-aug30.keystore
+signing-key-info-aug30.txt
