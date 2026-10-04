@@ -3,7 +3,7 @@
 // and only falls back to the cached copy if the device is offline.
 // This avoids "stuck on an old version" problems for a frequently-updated app.
 
-const CACHE_NAME = 'vaishno-pearl-v602';
+const CACHE_NAME = 'vaishno-pearl-v603';
 const PRECACHE_URLS = [
   './index.html',
   './manifest.webmanifest',
