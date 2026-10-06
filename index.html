@@ -598,6 +598,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <button class="tab" onclick="goTab('queries',this)">❓ Queries</button>
   <button class="tab" onclick="goTab('polls',this)">🗳️ Polls</button>
   <button class="tab" onclick="goTab('agm',this)">🏛️ AGM</button>
+  <button class="tab" onclick="goTab('fest-exp',this)">🎊 Festival Expenses</button>
 </div>
 
 <!-- ═══════════ DASHBOARD (board only) ═══════════ -->
@@ -1832,6 +1833,34 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div id="agm-list"></div>
   </div>
 </div>
+
+<!-- ═══════════ FESTIVAL EXPENSES (flat owner view) ═══════════ -->
+<div class="view hidden" id="v-fest-exp">
+  <div class="sec">🎊 Your Festival Contributions</div>
+  <div class="card">
+    <div class="ctitle">📊 Festival Status</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:var(--ok);color:#fff;padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;opacity:0.9">Total Contributed</div>
+        <div style="font-size:18px;font-weight:700" id="fo-total-contrib">₹0</div>
+      </div>
+      <div style="background:var(--err);color:#fff;padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;opacity:0.9">Outstanding</div>
+        <div style="font-size:18px;font-weight:700" id="fo-outstanding">₹0</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">📋 Festival Contribution History</div>
+    <div id="fo-contrib-list" style="font-size:12px;line-height:1.6"></div>
+  </div>
+  <div class="card" id="fo-pending-card" style="display:none">
+    <div class="ctitle">⏳ Outstanding Contributions to Pay</div>
+    <div id="fo-pending-list" style="margin-bottom:10px"></div>
+    <button class="btn btn-p" onclick="showPaymentOptions()">💳 Make Payment</button>
+  </div>
+</div>
+
 <div class="view hidden" id="v-committee">
   <div class="sec">👥 Committee / Board Members</div>
   <div class="card">
@@ -2160,7 +2189,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div class="sr"><span class="slb">Address</span><span style="font-size:10px;text-align:right;max-width:60%">Opp. Vistra Delight Apt, Survey No. 235/236, Kompally, Hyderabad - 500100</span></div>
     <div class="sr"><span class="slb">Reg. No</span><span style="font-size:10px">TG/MLKG/MACS/2025-300/FOW &amp; M</span></div>
     <div class="sr"><span class="slb">📞 Contact</span><span><a id="soc-phone-a2" href="tel:+918008964247" style="color:var(--P);font-weight:700;text-decoration:none">+91 80089 64247</a></span></div>
-    <div class="sr"><span class="slb">Version</span><span>5.1 (Oct 2026)</span></div>
+    <div class="sr"><span class="slb">Version</span><span>5.2 (Oct 2026)</span></div>
     <div class="sr"><span class="slb">© Rights</span><span style="font-size:10px;text-align:right;color:var(--P);font-weight:700">ManasaTech Innovations</span></div>
   </div>
   <div class="card">
@@ -6817,6 +6846,47 @@ function lhUpload(file){if(!file)return;if(file.size>4500000){showToast('File to
 function lhDownload(){var lh=st.letterhead;if(!lh||!lh.data){showToast('No letterhead uploaded yet');return;}var a=document.createElement('a');a.href=lh.data;a.download=lh.name||'Vaishno_Pearl_Letterhead';document.body.appendChild(a);a.click();a.remove();}
 function lhStatus(){var el=document.getElementById('lh-status');if(!el)return;var lh=st.letterhead;el.textContent=(lh&&lh.data)?('Saved: '+(lh.name||'letterhead')+' \u2014 choose Download to get it back.'):'No letterhead saved yet. Choose Upload to add one.';}
 
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// FESTIVAL EXPENSES - FLAT OWNER VIEW
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+function loadFestivalExpensesOwner(){
+  var myFlat=ownerFlat;
+  if(!myFlat){showToast('Please log in again');return;}
+  var allContribs=(vpState.festContribs||[]).filter(c=>c.flatNo===myFlat);
+  var totalContrib=allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
+  document.getElementById('fo-total-contrib').textContent='\u20b9'+Math.round(totalContrib).toLocaleString('en-IN');
+
+  var list=document.getElementById('fo-contrib-list');
+  if(!allContribs.length){
+    list.innerHTML='<div style="color:var(--muted);padding:10px;text-align:center">No festival contributions yet.</div>';
+  } else {
+    var h='';
+    allContribs.sort((a,b)=>(b.at||0)-(a.at||0)).forEach(c=>{
+      var dt=c.at?new Date(c.at).toLocaleDateString():'-';
+      h+=`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee"><div><div style="font-weight:500">${c.festival||'Festival'}</div><div style="font-size:11px;color:var(--muted)">${dt}</div></div><div style="font-weight:600;color:var(--P)">\u20b9${Math.round(c.amount||0).toLocaleString('en-IN')}</div></div>`;
+    });
+    list.innerHTML=h;
+  }
+
+  // Calculate outstanding by comparing all flat expenses vs contributions
+  var allExpenses=(vpState.allExp||[]).filter(e=>e.flatNo===myFlat&&e.type==='festival');
+  var totalExpenses=allExpenses.reduce((s,e)=>s+parseFloat(e.amt||0),0);
+  var outstanding=Math.max(0, totalExpenses-totalContrib);
+  document.getElementById('fo-outstanding').textContent='\u20b9'+Math.round(outstanding).toLocaleString('en-IN');
+
+  var pendingCard=document.getElementById('fo-pending-card');
+  if(outstanding>0){
+    pendingCard.style.display='block';
+    var plist=document.getElementById('fo-pending-list');
+    plist.innerHTML=`<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px;margin-bottom:10px">
+      <div style="font-weight:600;color:#856404">Outstanding Amount: \u20b9${Math.round(outstanding).toLocaleString('en-IN')}</div>
+      <div style="font-size:12px;color:#856404;margin-top:4px">Please complete your festival contributions to stay updated with society activities.</div>
+    </div>`;
+  } else {
+    pendingCard.style.display='none';
+  }
+}
+
 function goTab(id,btn){
   const tabSet=isAdmin?'#board-tabs':'#owner-tabs';
   document.querySelectorAll(tabSet+' .tab').forEach(t=>t.classList.remove('on'));
@@ -6861,6 +6931,7 @@ function goTab(id,btn){
   else if(id==='meetings')rMeetings();
   else if(id==='payments')rPayments();
   else if(id==='polls')rPolls();
+  else if(id==='fest-exp')loadFestivalExpensesOwner();
 }
 
 // ══════════════════════════════════════════
