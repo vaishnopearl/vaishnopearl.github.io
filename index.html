@@ -10442,46 +10442,46 @@ function loadFestivalContributions(){
   }
 
   var festVal = festSel.value;
-  var allContribs = (vpState.festContribs||[]).filter(c=>c.festival===festVal);
-  var allFestExp = (vpState.festExp||[]).filter(e=>e.festival===festVal);
+  var allContribs = (st.festivalContributions||[]).filter(c=>c.festival===festVal);
+  var allFestExp = (st.festivals||[]).filter(e=>e.festival===festVal);
 
   var totalCollected = allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
   var totalExpense = allFestExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
   var balance = totalCollected - totalExpense;
 
-  document.getElementById('fcf-total-collected').textContent = '₹' + totalCollected.toLocaleString('en-IN');
-  document.getElementById('fcf-total-expense').textContent = '₹' + totalExpense.toLocaleString('en-IN');
-  document.getElementById('fcf-balance').textContent = '₹' + balance.toLocaleString('en-IN');
+  document.getElementById('fcf-total-collected').textContent = '₹' + Math.round(totalCollected).toLocaleString('en-IN');
+  document.getElementById('fcf-total-expense').textContent = '₹' + Math.round(totalExpense).toLocaleString('en-IN');
+  document.getElementById('fcf-balance').textContent = '₹' + Math.round(balance).toLocaleString('en-IN');
 
-  var allFlats = vpState.flats||[];
-  var contributed = allContribs.map(c=>c.flatNo).filter((v,i,a)=>a.indexOf(v)===i);
+  var allFlats = FD||[];
+  var contributed = allContribs.map(c=>c.flat).filter((v,i,a)=>a.indexOf(v)===i);
   var pending = allFlats.length - contributed.length;
 
   document.getElementById('fcf-contributed-count').textContent = contributed.length + '/' + allFlats.length;
   document.getElementById('fcf-pending-count').textContent = pending;
 
-  // Contribution list
+  // Contribution list - note: st.festivalContributions uses 'flat' not 'flatNo', and 'ts' for timestamp
   var listHtml = allContribs.filter(c=>
-    searchVal==='' || c.flatNo.toString().includes(searchVal) || (c.name||'').toLowerCase().includes(searchVal.toLowerCase())
+    searchVal==='' || c.flat.toString().includes(searchVal) || (c.name||'').toLowerCase().includes(searchVal.toLowerCase())
   ).map(c=>`
     <div class="frow">
       <div class="fi">
-        <div class="fno">Flat ${c.flatNo}</div>
+        <div class="fno">Flat ${c.flat}</div>
         <div class="fnm">${c.name||'—'}</div>
       </div>
       <div class="fc">
         <div class="bdg bp">✅ Contributed</div>
-        <div style="font-weight:700;color:var(--P)">₹${parseFloat(c.amount||0).toLocaleString('en-IN')}</div>
+        <div style="font-weight:700;color:var(--P)">₹${Math.round(parseFloat(c.amount||0)).toLocaleString('en-IN')}</div>
       </div>
     </div>
   `).join('');
   document.getElementById('fcf-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No contributions yet</div>';
 
-  // Expense list
+  // Expense list - st.festivals uses 'ts' for timestamp, not 'date'
   var expHtml = allFestExp.map(e=>`
     <div class="sr">
-      <span class="slb">${e.item||e.description||'Expense'} (${new Date(e.date||Date.now()).toLocaleDateString('en-IN')})</span>
-      <span><b>₹${parseFloat(e.amount||0).toLocaleString('en-IN')}</b></span>
+      <span class="slb">${e.item||'Expense'} (${new Date(e.ts||Date.now()).toLocaleDateString('en-IN')})</span>
+      <span><b>₹${Math.round(parseFloat(e.amount||0)).toLocaleString('en-IN')}</b></span>
     </div>
   `).join('');
   document.getElementById('fcf-expense-list').innerHTML = expHtml || '<p style="font-size:12px;color:var(--muted)">No expenses recorded</p>';
@@ -10542,14 +10542,14 @@ function initFlatExpensesTab(){
 }
 
 function initFestivalContribTab(){
-  // Populate festival select
+  // Populate festival select - read from correct data source (st, not vpState)
   var festSel = document.getElementById('fc-fest-select');
   if(festSel){
     var allFestivals = [];
-    (vpState.festExp||[]).forEach(e=>{
+    (st.festivals||[]).forEach(e=>{
       if(!allFestivals.includes(e.festival)) allFestivals.push(e.festival);
     });
-    (vpState.festContribs||[]).forEach(c=>{
+    (st.festivalContributions||[]).forEach(c=>{
       if(!allFestivals.includes(c.festival)) allFestivals.push(c.festival);
     });
     festSel.innerHTML = '<option value="">— Select Festival —</option>' +
