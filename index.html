@@ -1863,6 +1863,10 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div id="fo-expenses-breakdown" style="font-size:12px;line-height:1.6"></div>
   </div>
   <div class="card">
+    <div class="ctitle">📝 Detailed Expense List</div>
+    <div id="fo-detailed-expenses" style="font-size:12px;line-height:1.6;max-height:400px;overflow-y:auto"></div>
+  </div>
+  <div class="card">
     <div class="ctitle">📋 Festival Contribution History</div>
     <div id="fo-contrib-list" style="font-size:12px;line-height:1.6"></div>
   </div>
@@ -6906,6 +6910,33 @@ function loadFestivalExpensesOwner(){
       </div>`;
     });
     breakdownList.innerHTML=h;
+  }
+
+  // Display detailed expense list
+  var detailedList=document.getElementById('fo-detailed-expenses');
+  if(!allExpenses.length){
+    detailedList.innerHTML='<div style="color:var(--muted);padding:10px;text-align:center">No expenses recorded yet.</div>';
+  } else {
+    var sortedExpenses=allExpenses.slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+    var h='';
+    var runningTotal=0;
+    sortedExpenses.forEach((e,idx)=>{
+      runningTotal+=parseFloat(e.amount||0);
+      var dt=e.ts?new Date(e.ts).toLocaleDateString('en-IN'):'-';
+      var time=e.ts?new Date(e.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
+      h+=`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px;border-bottom:1px solid #f0f0f0">
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--P)">${e.festival||'Festival'}</div>
+          ${e.item?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${e.item}</div>`:''}
+          <div style="font-size:10px;color:#999;margin-top:4px">${dt} ${time}</div>
+        </div>
+        <div style="text-align:right;margin-left:12px;white-space:nowrap">
+          <div style="font-weight:600;color:var(--P)">₹${Math.round(e.amount||0).toLocaleString('en-IN')}</div>
+          <div style="font-size:10px;color:#999;margin-top:2px">#${idx+1}</div>
+        </div>
+      </div>`;
+    });
+    detailedList.innerHTML=h;
   }
 
   var list=document.getElementById('fo-contrib-list');
