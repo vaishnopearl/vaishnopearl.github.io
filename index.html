@@ -1840,15 +1840,19 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <div class="card">
     <div class="ctitle">📊 Festival Status</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:#6366f1;color:#fff;padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;opacity:0.9">Total Expenses</div>
+        <div style="font-size:18px;font-weight:700" id="fo-total-expenses">₹0</div>
+      </div>
       <div style="background:var(--ok);color:#fff;padding:12px;border-radius:8px;text-align:center">
-        <div style="font-size:11px;opacity:0.9">Total Contributed</div>
+        <div style="font-size:11px;opacity:0.9">Your Contribution</div>
         <div style="font-size:18px;font-weight:700" id="fo-total-contrib">₹0</div>
       </div>
-      <div style="background:var(--err);color:#fff;padding:12px;border-radius:8px;text-align:center">
-        <div style="font-size:11px;opacity:0.9">Outstanding</div>
-        <div style="font-size:18px;font-weight:700" id="fo-outstanding">₹0</div>
-      </div>
     </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">🎉 Festival Expenses Breakdown</div>
+    <div id="fo-expenses-breakdown" style="font-size:12px;line-height:1.6"></div>
   </div>
   <div class="card">
     <div class="ctitle">📋 Festival Contribution History</div>
@@ -6855,6 +6859,44 @@ function loadFestivalExpensesOwner(){
   var allContribs=(st.festivalContributions||[]).filter(c=>c.flat===myFlat);
   var totalContrib=allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
   document.getElementById('fo-total-contrib').textContent='\u20b9'+Math.round(totalContrib).toLocaleString('en-IN');
+
+  // Calculate total festival expenses from all entries
+  var allExpenses=(st.festivals||[]);
+  var totalExpenses=allExpenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  document.getElementById('fo-total-expenses').textContent='\u20b9'+Math.round(totalExpenses).toLocaleString('en-IN');
+
+  // Group expenses by festival name
+  var expensesByFest={};
+  allExpenses.forEach(e=>{
+    var festName=e.festival||'Other';
+    if(!expensesByFest[festName])expensesByFest[festName]={amount:0,count:0};
+    expensesByFest[festName].amount+=parseFloat(e.amount||0);
+    expensesByFest[festName].count+=1;
+  });
+
+  // Display festival expenses breakdown
+  var breakdownList=document.getElementById('fo-expenses-breakdown');
+  if(!allExpenses.length){
+    breakdownList.innerHTML='<div style="color:var(--muted);padding:10px;text-align:center">No festival expenses recorded yet.</div>';
+  } else {
+    var h='';
+    var festNames=Object.keys(expensesByFest).sort();
+    festNames.forEach(festName=>{
+      var data=expensesByFest[festName];
+      var pct=totalExpenses>0?(data.amount/totalExpenses*100).toFixed(0):'0';
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid #eee">
+        <div>
+          <div style="font-weight:600;color:var(--P)">${festName}</div>
+          <div style="font-size:11px;color:var(--muted)">${data.count} expense(s)</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:600;color:var(--P)">\u20b9${Math.round(data.amount).toLocaleString('en-IN')}</div>
+          <div style="font-size:11px;color:var(--muted)">${pct}% of total</div>
+        </div>
+      </div>`;
+    });
+    breakdownList.innerHTML=h;
+  }
 
   var list=document.getElementById('fo-contrib-list');
   if(!allContribs.length){
