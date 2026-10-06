@@ -6860,10 +6860,28 @@ function loadFestivalExpensesOwner(){
   if(!allContribs.length){
     list.innerHTML='<div style="color:var(--muted);padding:10px;text-align:center">No festival contributions yet.</div>';
   } else {
+    // Group contributions by month
+    var byMonth={};
+    allContribs.forEach(c=>{
+      var dt=c.at?new Date(c.at):new Date();
+      var monthKey=dt.toLocaleDateString('en-IN',{year:'numeric',month:'long'});
+      if(!byMonth[monthKey])byMonth[monthKey]=[];
+      byMonth[monthKey].push(c);
+    });
+
     var h='';
-    allContribs.sort((a,b)=>(b.at||0)-(a.at||0)).forEach(c=>{
-      var dt=c.at?new Date(c.at).toLocaleDateString():'-';
-      h+=`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee"><div><div style="font-weight:500">${c.festival||'Festival'}</div><div style="font-size:11px;color:var(--muted)">${dt}</div></div><div style="font-weight:600;color:var(--P)">\u20b9${Math.round(c.amount||0).toLocaleString('en-IN')}</div></div>`;
+    var monthsSorted=Object.keys(byMonth).sort((a,b)=>new Date('1 '+b)-new Date('1 '+a));
+
+    monthsSorted.forEach(month=>{
+      var contribs=byMonth[month];
+      var monthTotal=contribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
+      h+=`<div style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px">
+        <div style="font-weight:700;color:var(--P);margin-bottom:10px">\ud83d\udcc5 ${month} \u2014 \u20b9${Math.round(monthTotal).toLocaleString('en-IN')}</div>`;
+      contribs.sort((a,b)=>(b.at||0)-(a.at||0)).forEach(c=>{
+        var dt=c.at?new Date(c.at).toLocaleDateString():'-';
+        h+=`<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px"><div><span style="font-weight:500">${c.festival||'Festival'}</span><span style="color:var(--muted);font-size:11px;margin-left:8px">${dt}</span></div><div style="color:var(--P);font-weight:600">\u20b9${Math.round(c.amount||0).toLocaleString('en-IN')}</div></div>`;
+      });
+      h+='</div>';
     });
     list.innerHTML=h;
   }
