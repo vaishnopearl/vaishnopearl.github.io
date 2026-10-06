@@ -580,6 +580,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <button class="tab" onclick="goTab('compliance',this)">📜 Compliance</button>
   <button class="tab" onclick="goTab('handover',this)">🔑 Handover</button>
   <button class="tab" onclick="goTab('agm',this)">🗳️ AGM</button>
+  <button class="tab" onclick="goTab('debug',this)">🔧 Debug</button>
   <button class="tab" onclick="goTab('settings',this)">⚙️ Settings</button>
 </div>
 
@@ -1627,6 +1628,22 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <button class="btn btn-o" style="color:var(--P);margin-bottom:8px" onclick="exportFestivalContribCSV()">📥 Export to CSV</button>
     <button class="btn btn-wa" style="margin-bottom:8px" onclick="sendFestivalContribWhatsApp()">📲 Send via WhatsApp</button>
     <button class="btn btn-p" onclick="printFestivalContrib()">🖨️ Print Report</button>
+  </div>
+</div>
+
+<!-- DEBUG DIAGNOSTIC TAB -->
+<div class="view hidden" id="v-debug">
+  <div class="sec">🔧 Diagnostics (Board Members)</div>
+  <div class="card">
+    <div style="margin-bottom:15px">
+      <button class="btn btn-o" style="width:100%;margin-bottom:8px" onclick="vpShowFestivalData()">📊 Show Festival Data in Storage</button>
+      <button class="btn btn-o" style="width:100%;margin-bottom:8px" onclick="vpShowContributionData()">💰 Show Festival Contributions Data</button>
+      <button class="btn btn-p" style="width:100%" onclick="vpRefreshFestivalDropdown()">🔄 Refresh Festival Dropdown NOW</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">📋 Data Output</div>
+    <pre id="debug-output" style="background:var(--bg2);padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;white-space:pre-wrap;max-height:400px;color:var(--fg)"></pre>
   </div>
 </div>
 
@@ -10557,6 +10574,79 @@ function initFestivalContribTab(){
   }
 
   loadFestivalContributions();
+}
+
+// ═══════════ DEBUG DIAGNOSTICS ═══════════
+function vpShowFestivalData(){
+  var output = document.getElementById('debug-output');
+  var festivals = st.festivals||[];
+  var text = '📊 FESTIVAL EXPENSES DATA\n';
+  text += '========================\n';
+  text += 'Total entries: ' + festivals.length + '\n\n';
+  if(festivals.length === 0){
+    text += '⚠️ No festival expenses found!\n';
+  } else {
+    festivals.forEach(function(f,i){
+      text += '[' + i + '] Festival: ' + (f.festival||'MISSING') + '\n';
+      text += '    Item: ' + (f.item||'—') + '\n';
+      text += '    Amount: ₹' + (f.amount||0) + '\n';
+      text += '    ID: ' + (f.id||'—') + '\n';
+      text += '    Timestamp: ' + new Date(f.ts).toLocaleString() + '\n\n';
+    });
+  }
+  output.textContent = text;
+  showToast('✅ Festival data loaded — see below');
+}
+
+function vpShowContributionData(){
+  var output = document.getElementById('debug-output');
+  var contributions = st.festivalContributions||[];
+  var text = '💰 FESTIVAL CONTRIBUTIONS DATA\n';
+  text += '=============================\n';
+  text += 'Total entries: ' + contributions.length + '\n\n';
+  if(contributions.length === 0){
+    text += '⚠️ No contributions found!\n';
+  } else {
+    contributions.forEach(function(c,i){
+      text += '[' + i + '] Festival: ' + (c.festival||'MISSING') + '\n';
+      text += '    Flat: ' + (c.flat||'MISSING') + '\n';
+      text += '    Owner: ' + (c.name||'—') + '\n';
+      text += '    Amount: ₹' + (c.amount||0) + '\n';
+      text += '    ID: ' + (c.id||'—') + '\n';
+      text += '    Timestamp: ' + new Date(c.ts).toLocaleString() + '\n\n';
+    });
+  }
+  output.textContent = text;
+  showToast('✅ Contribution data loaded — see below');
+}
+
+function vpRefreshFestivalDropdown(){
+  var output = document.getElementById('debug-output');
+  var text = '🔄 REFRESHING DROPDOWN\n';
+  text += '======================\n\n';
+
+  // Manually call initFestivalContribTab
+  initFestivalContribTab();
+
+  // Check dropdown
+  var festSel = document.getElementById('fc-fest-select');
+  if(!festSel){
+    text += '❌ Dropdown element NOT FOUND!\n';
+  } else {
+    var options = festSel.options||[];
+    text += '✅ Dropdown found\n';
+    text += 'Options count: ' + options.length + '\n\n';
+    for(var i=0; i<options.length; i++){
+      text += '[' + i + '] ' + options[i].text + ' = ' + options[i].value + '\n';
+    }
+    if(options.length <= 1){
+      text += '\n⚠️ ISSUE: Dropdown is EMPTY (only placeholder)\n';
+      text += '\nDebug: Check st.festivals and st.festivalContributions arrays\n';
+    }
+  }
+
+  output.textContent = text;
+  showToast('✅ Dropdown refreshed — check data above');
 }
 
 // ═══════════ OUTSTANDING AMOUNTS & PAYMENT REMINDERS ═══════════
