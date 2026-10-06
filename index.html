@@ -566,6 +566,8 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <button class="tab" onclick="goTab('queries',this)">❓ Queries</button>
   <button class="tab" onclick="goTab('polls',this)">🗳️ Polls</button>
   <button class="tab" onclick="goTab('festivals',this)">🎉 Festivals</button>
+  <button class="tab" onclick="goTab('flat-expenses',this)">👤 Flat Expenses</button>
+  <button class="tab" onclick="goTab('festival-contrib',this)">🎊 Festival Contributions</button>
   <button class="tab" onclick="goTab('collection',this)">🧾 Collection</button>
   <button class="tab" onclick="goTab('trends',this)">📈 Trends</button>
   <button class="tab" onclick="goTab('defaulters',this)">⚠️ Defaulters</button>
@@ -1441,6 +1443,113 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div id="ft-yoy-list"></div>
   </div>
 </div>
+
+<!-- ═══════════ FLAT OWNER EXPENSES ═══════════ -->
+<div class="view hidden" id="v-flat-expenses">
+  <div class="sec">👤 Flat Expenses Summary</div>
+  <div class="card">
+    <div class="fg" style="margin-bottom:8px">
+      <label class="fl">Select Flat</label>
+      <select id="fe-flat-select" onchange="loadFlatExpenses()"></select>
+    </div>
+    <div class="fg">
+      <label class="fl">Month / Year</label>
+      <select id="fe-month-select" onchange="loadFlatExpenses()"></select>
+    </div>
+  </div>
+
+  <div class="mg" style="margin-bottom:11px">
+    <div class="met gold">
+      <div class="mic">📊</div>
+      <div class="mlb">Total Expenses</div>
+      <div class="mv b" id="fe-total-amount">₹0</div>
+    </div>
+    <div class="met">
+      <div class="mic">📝</div>
+      <div class="mlb">No. of Entries</div>
+      <div class="mv b" id="fe-entry-count">0</div>
+    </div>
+  </div>
+
+  <div class="sec">📋 Expense Breakdown by Category</div>
+  <div class="card">
+    <div id="fe-category-breakdown"></div>
+  </div>
+
+  <div class="sec">📄 Detailed Expense List</div>
+  <input id="fe-search" type="search" placeholder="🔍 Search category or note…" oninput="loadFlatExpenses()" style="width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid var(--bdr);border-radius:10px;font-size:13px;box-sizing:border-box"/>
+  <div id="fe-list"></div>
+
+  <div class="sec">💾 Export & Actions</div>
+  <div class="card">
+    <button class="btn btn-o" style="color:var(--P);margin-bottom:8px" onclick="exportFlatExpensesCSV()">📥 Export to CSV</button>
+    <button class="btn btn-wa" style="margin-bottom:8px" onclick="sendFlatExpensesWhatsApp()">📲 Send via WhatsApp</button>
+    <button class="btn btn-p" onclick="printFlatExpenses()">🖨️ Print Statement</button>
+  </div>
+</div>
+
+<!-- ═══════════ FESTIVAL CONTRIBUTIONS BY FLAT ═══════════ -->
+<div class="view hidden" id="v-festival-contrib">
+  <div class="sec">🎊 Festival Contributions by Flat</div>
+  <div class="card">
+    <div class="fg" style="margin-bottom:8px">
+      <label class="fl">Select Festival</label>
+      <select id="fc-fest-select" onchange="loadFestivalContributions()"></select>
+    </div>
+  </div>
+
+  <div class="mg" style="margin-bottom:11px">
+    <div class="met g">
+      <div class="mic">💰</div>
+      <div class="mlb">Total Collected</div>
+      <div class="mv g" id="fcf-total-collected">₹0</div>
+    </div>
+    <div class="met r">
+      <div class="mic">📉</div>
+      <div class="mlb">Total Expenses</div>
+      <div class="mv r" id="fcf-total-expense">₹0</div>
+    </div>
+  </div>
+
+  <div class="met b" style="margin-bottom:11px">
+    <div class="mlb">Balance (Collected − Expense)</div>
+    <div class="mv b" id="fcf-balance">₹0</div>
+  </div>
+
+  <div class="sec">👥 Contribution Status</div>
+  <div class="card">
+    <div class="mg" style="margin-bottom:0">
+      <div class="met g">
+        <div class="mic">✅</div>
+        <div class="mlb">Contributed</div>
+        <div class="mv g" id="fcf-contributed-count">0/20</div>
+      </div>
+      <div class="met r">
+        <div class="mic">⏳</div>
+        <div class="mlb">Pending</div>
+        <div class="mv r" id="fcf-pending-count">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">📋 Flat-wise Contributions</div>
+  <input id="fcf-search" type="search" placeholder="🔍 Search flat number or owner…" oninput="loadFestivalContributions()" style="width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid var(--bdr);border-radius:10px;font-size:13px;box-sizing:border-box"/>
+  <div id="fcf-list"></div>
+
+  <div class="sec">🎊 Festival Expense Details</div>
+  <div class="card">
+    <div class="sec" style="margin:0 0 10px">Expenses for this festival</div>
+    <div id="fcf-expense-list"></div>
+  </div>
+
+  <div class="sec">💾 Export & Actions</div>
+  <div class="card">
+    <button class="btn btn-o" style="color:var(--P);margin-bottom:8px" onclick="exportFestivalContribCSV()">📥 Export to CSV</button>
+    <button class="btn btn-wa" style="margin-bottom:8px" onclick="sendFestivalContribWhatsApp()">📲 Send via WhatsApp</button>
+    <button class="btn btn-p" onclick="printFestivalContrib()">🖨️ Print Report</button>
+  </div>
+</div>
+
 <div class="view hidden" id="v-collection">
   <div class="sec">Collection — Owners &amp; Tenants</div>
   <div class="mbar"><span style="font-size:12px;color:var(--muted);flex-shrink:0">📅</span><select id="cl-mon" onchange="rCollection()"></select></div>
@@ -6652,6 +6761,8 @@ function goTab(id,btn){
   else if(id==='staff')rStaff();
   else if(id==='tanker')rTanker();
   else if(id==='festivals')rFestivals();
+  else if(id==='flat-expenses')initFlatExpensesTab();
+  else if(id==='festival-contrib')initFestivalContribTab();
   else if(id==='collection')rCollection();
   else if(id==='trends')rTrends();
   else if(id==='defaulters')rDefaulters();
@@ -9851,6 +9962,216 @@ function vpCloseMenu(){document.body.classList.remove('vp-menu-open');}
     if(!vpSilentRefresh){vpCloseMenu();try{window.scrollTo(0,0);}catch(e){}}
     return r;
   };
+
+// ═══════════ FLAT OWNER EXPENSES ═══════════
+function loadFlatExpenses(){
+  var flatSel = document.getElementById('fe-flat-select');
+  var monthSel = document.getElementById('fe-month-select');
+  var searchVal = (document.getElementById('fe-search')||{}).value||'';
+
+  if(!flatSel||!flatSel.value){
+    document.getElementById('fe-list').innerHTML='<div class="card" style="text-align:center;padding:20px;color:var(--muted)">Please select a flat</div>';
+    return;
+  }
+
+  var flatNum = flatSel.value;
+  var monthKey = monthSel?monthSel.value:new Date().toISOString().slice(0,7);
+
+  var allExp = (vpState.allExp||[]).filter(e => {
+    var match = searchVal==='' || e.category.toLowerCase().includes(searchVal.toLowerCase()) ||
+                (e.note||'').toLowerCase().includes(searchVal.toLowerCase()) ||
+                e.amount.toString().includes(searchVal);
+    return match && e.flat === flatNum && (!e.month || e.month.includes(monthKey));
+  });
+
+  var total = allExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  document.getElementById('fe-total-amount').textContent = '₹' + total.toLocaleString('en-IN');
+  document.getElementById('fe-entry-count').textContent = allExp.length;
+
+  // Category breakdown
+  var byCategory = {};
+  allExp.forEach(e=>{
+    if(!byCategory[e.category]) byCategory[e.category]={count:0,amount:0};
+    byCategory[e.category].count++;
+    byCategory[e.category].amount += parseFloat(e.amount||0);
+  });
+
+  var catHtml = '';
+  Object.keys(byCategory).sort().forEach(cat=>{
+    catHtml += `<div class="sr"><span class="slb">${cat}</span><span><b>₹${byCategory[cat].amount.toLocaleString('en-IN')}</b> (${byCategory[cat].count})</span></div>`;
+  });
+  document.getElementById('fe-category-breakdown').innerHTML = catHtml || '<p style="color:var(--muted);font-size:12px">No expenses found</p>';
+
+  // Expense list
+  var listHtml = allExp.map(e=>`
+    <div class="erow">
+      <div class="eic">${{Watchman:'🛡️',Electricity:'⚡',Water:'💧',Internet:'🌐',Lift:'🛗',Electrician:'🔌',Plumber:'🔧',Maintenance:'👷',CCTV:'📷',Motor:'⚙️',Dust:'🧹',Housekeeping:'🧺',Flowers:'🌸',Building:'🏗️',Solar:'☀️',Festival:'🎊',Additional:'➕',Other:'📝'}[e.category.split(' ')[0]]||'📋'}</div>
+      <div class="ei">
+        <div class="elb">${e.category}</div>
+        <div class="ect">${new Date(e.date||Date.now()).toLocaleDateString('en-IN')}</div>
+        ${e.note?`<div class="enote">${e.note}</div>`:''}
+      </div>
+      <div class="eam">₹${parseFloat(e.amount||0).toLocaleString('en-IN')}</div>
+    </div>
+  `).join('');
+  document.getElementById('fe-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No expenses for this flat in this period</div>';
+}
+
+function exportFlatExpensesCSV(){
+  var flatSel = document.getElementById('fe-flat-select');
+  if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
+  var csv = 'Date,Category,Amount,Note\\n';
+  var allExp = (vpState.allExp||[]).filter(e=>e.flat===flatSel.value);
+  allExp.forEach(e=>csv+=(e.date||'')+','+(e.category||'')+','+(e.amount||0)+','+((e.note||'').replace(/,/g,';'))+'\n');
+  var blob = new Blob([csv],{type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Flat_'+flatSel.value+'_Expenses.csv';
+  a.click();
+}
+
+function sendFlatExpensesWhatsApp(){
+  var flatSel = document.getElementById('fe-flat-select');
+  if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
+  var msg = 'Expense Statement - Flat '+flatSel.value+': '+document.getElementById('fe-total-amount').textContent+' ('+document.getElementById('fe-entry-count').textContent+' entries)';
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+
+function printFlatExpenses(){
+  var flatSel = document.getElementById('fe-flat-select');
+  if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
+  window.print();
+}
+
+// ═══════════ FESTIVAL CONTRIBUTIONS BY FLAT ═══════════
+function loadFestivalContributions(){
+  var festSel = document.getElementById('fc-fest-select');
+  var searchVal = (document.getElementById('fcf-search')||{}).value||'';
+
+  if(!festSel||!festSel.value){
+    document.getElementById('fcf-list').innerHTML='<div class="card" style="text-align:center;padding:20px;color:var(--muted)">Please select a festival</div>';
+    return;
+  }
+
+  var festVal = festSel.value;
+  var allContribs = (vpState.festContribs||[]).filter(c=>c.festival===festVal);
+  var allFestExp = (vpState.festExp||[]).filter(e=>e.festival===festVal);
+
+  var totalCollected = allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
+  var totalExpense = allFestExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  var balance = totalCollected - totalExpense;
+
+  document.getElementById('fcf-total-collected').textContent = '₹' + totalCollected.toLocaleString('en-IN');
+  document.getElementById('fcf-total-expense').textContent = '₹' + totalExpense.toLocaleString('en-IN');
+  document.getElementById('fcf-balance').textContent = '₹' + balance.toLocaleString('en-IN');
+
+  var allFlats = vpState.flats||[];
+  var contributed = allContribs.map(c=>c.flatNo).filter((v,i,a)=>a.indexOf(v)===i);
+  var pending = allFlats.length - contributed.length;
+
+  document.getElementById('fcf-contributed-count').textContent = contributed.length + '/' + allFlats.length;
+  document.getElementById('fcf-pending-count').textContent = pending;
+
+  // Contribution list
+  var listHtml = allContribs.filter(c=>
+    searchVal==='' || c.flatNo.toString().includes(searchVal) || (c.name||'').toLowerCase().includes(searchVal.toLowerCase())
+  ).map(c=>`
+    <div class="frow">
+      <div class="fi">
+        <div class="fno">Flat ${c.flatNo}</div>
+        <div class="fnm">${c.name||'—'}</div>
+      </div>
+      <div class="fc">
+        <div class="bdg bp">✅ Contributed</div>
+        <div style="font-weight:700;color:var(--P)">₹${parseFloat(c.amount||0).toLocaleString('en-IN')}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('fcf-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No contributions yet</div>';
+
+  // Expense list
+  var expHtml = allFestExp.map(e=>`
+    <div class="sr">
+      <span class="slb">${e.item||e.description||'Expense'} (${new Date(e.date||Date.now()).toLocaleDateString('en-IN')})</span>
+      <span><b>₹${parseFloat(e.amount||0).toLocaleString('en-IN')}</b></span>
+    </div>
+  `).join('');
+  document.getElementById('fcf-expense-list').innerHTML = expHtml || '<p style="font-size:12px;color:var(--muted)">No expenses recorded</p>';
+}
+
+function exportFestivalContribCSV(){
+  var festSel = document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){alert('Please select a festival');return;}
+  var csv = 'Flat No,Owner Name,Amount Contributed\\n';
+  var contribs = (vpState.festContribs||[]).filter(c=>c.festival===festSel.value);
+  contribs.forEach(c=>csv+=c.flatNo+','+(c.name||'')+','+parseFloat(c.amount||0)+'\n');
+  var blob = new Blob([csv],{type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = festSel.value+'_Contributions.csv';
+  a.click();
+}
+
+function sendFestivalContribWhatsApp(){
+  var festSel = document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){alert('Please select a festival');return;}
+  var msg = festSel.value+' Contributions: '+document.getElementById('fcf-total-collected').textContent;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+
+function printFestivalContrib(){
+  var festSel = document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){alert('Please select a festival');return;}
+  window.print();
+}
+
+// ═══════════ INITIALIZATION FOR NEW TABS ═══════════
+function initFlatExpensesTab(){
+  // Populate flat select
+  var flatSel = document.getElementById('fe-flat-select');
+  if(flatSel){
+    var allFlats = vpState.flats||FD||[];
+    flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
+      allFlats.map((f,i)=>`<option value="${i+1}">Flat ${i+1} ${f.name?'('+f.name+')':''}</option>`).join('');
+  }
+
+  // Populate month select
+  var monthSel = document.getElementById('fe-month-select');
+  if(monthSel){
+    var months = [];
+    for(var i=11;i>=0;i--){
+      var d = new Date();
+      d.setMonth(d.getMonth()-i);
+      var ym = d.toISOString().slice(0,7);
+      var ml = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      months.push({val:ym,label:ml[d.getMonth()]+' '+d.getFullYear()});
+    }
+    monthSel.innerHTML = months.map(m=>`<option value="${m.val}">${m.label}</option>`).join('');
+  }
+
+  loadFlatExpenses();
+}
+
+function initFestivalContribTab(){
+  // Populate festival select
+  var festSel = document.getElementById('fc-fest-select');
+  if(festSel){
+    var allFestivals = [];
+    (vpState.festExp||[]).forEach(e=>{
+      if(!allFestivals.includes(e.festival)) allFestivals.push(e.festival);
+    });
+    (vpState.festContribs||[]).forEach(c=>{
+      if(!allFestivals.includes(c.festival)) allFestivals.push(c.festival);
+    });
+    festSel.innerHTML = '<option value="">— Select Festival —</option>' +
+      allFestivals.sort().map(f=>`<option value="${f}">${f}</option>`).join('');
+  }
+
+  loadFestivalContributions();
+}
+
   document.addEventListener('keydown',function(e){if(e.key==='Escape')vpCloseMenu();});
 })();
 </script>
