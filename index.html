@@ -10491,8 +10491,8 @@ function exportFestivalContribCSV(){
   var festSel = document.getElementById('fc-fest-select');
   if(!festSel||!festSel.value){alert('Please select a festival');return;}
   var csv = 'Flat No,Owner Name,Amount Contributed\\n';
-  var contribs = (vpState.festContribs||[]).filter(c=>c.festival===festSel.value);
-  contribs.forEach(c=>csv+=c.flatNo+','+(c.name||'')+','+parseFloat(c.amount||0)+'\n');
+  var contribs = (st.festivalContributions||[]).filter(c=>c.festival===festSel.value);
+  contribs.forEach(c=>csv+='Flat '+c.flat+','+(c.name||'')+','+parseFloat(c.amount||0)+'\n');
   var blob = new Blob([csv],{type:'text/csv'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -10519,7 +10519,7 @@ function initFlatExpensesTab(){
   // Populate flat select
   var flatSel = document.getElementById('fe-flat-select');
   if(flatSel){
-    var allFlats = vpState.flats||FD||[];
+    var allFlats = FD||[];
     flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
       allFlats.map((f,i)=>`<option value="${i+1}">Flat ${i+1} ${f.name?'('+f.name+')':''}</option>`).join('');
   }
