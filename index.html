@@ -6186,6 +6186,9 @@ function startHandover(){
   st.handovers.unshift({id:uid(),flatNo:flat,type:type,person:person,checklist:items,status:'pending',
     createdBy:(ROLES[currentRole]||{}).label||'Board',createdAt:Date.now()});
   sv();
+  // Reset form
+  document.getElementById('ho-flat').value='';
+  document.getElementById('ho-type').value='movein';
   document.getElementById('ho-person').value='';
   rHandovers();
   showToast('✅ Checklist started for Flat '+flat);
