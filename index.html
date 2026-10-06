@@ -568,6 +568,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <button class="tab" onclick="goTab('festivals',this)">🎉 Festivals</button>
   <button class="tab" onclick="goTab('flat-expenses',this)">👤 Flat Expenses</button>
   <button class="tab" onclick="goTab('festival-contrib',this)">🎊 Festival Contributions</button>
+  <button class="tab" onclick="goTab('outstanding',this)">⚠️ Outstanding</button>
   <button class="tab" onclick="goTab('collection',this)">🧾 Collection</button>
   <button class="tab" onclick="goTab('trends',this)">📈 Trends</button>
   <button class="tab" onclick="goTab('defaulters',this)">⚠️ Defaulters</button>
@@ -1480,11 +1481,89 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <input id="fe-search" type="search" placeholder="🔍 Search category or note…" oninput="loadFlatExpenses()" style="width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid var(--bdr);border-radius:10px;font-size:13px;box-sizing:border-box"/>
   <div id="fe-list"></div>
 
+  <div class="sec">💰 Outstanding Amount</div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Amount Due</div>
+        <div id="fe-outstanding" style="font-size:24px;font-weight:800;color:var(--err)">₹0</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Payment Status</div>
+        <div id="fe-payment-status" style="font-size:14px;font-weight:700;padding:4px 8px;border-radius:4px;background:var(--okB);color:var(--ok)">✅ Paid</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">📊 Year-over-Year Comparison</div>
+  <div class="card">
+    <div class="fg" style="margin-bottom:8px">
+      <label class="fl">Expense Category</label>
+      <select id="fe-yoy-category" onchange="loadYoYExpenses()"></select>
+    </div>
+    <div id="fe-yoy-chart"></div>
+  </div>
+
   <div class="sec">💾 Export & Actions</div>
   <div class="card">
     <button class="btn btn-o" style="color:var(--P);margin-bottom:8px" onclick="exportFlatExpensesCSV()">📥 Export to CSV</button>
-    <button class="btn btn-wa" style="margin-bottom:8px" onclick="sendFlatExpensesWhatsApp()">📲 Send via WhatsApp</button>
+    <button class="btn btn-wa" style="margin-bottom:8px" onclick="sendFlatExpensesWhatsApp()">📲 Send Statement</button>
+    <button class="btn btn-r" style="margin-bottom:8px" onclick="sendPaymentReminder()">🔔 Send Payment Reminder</button>
     <button class="btn btn-p" onclick="printFlatExpenses()">🖨️ Print Statement</button>
+  </div>
+</div>
+
+<!-- ═══════════ OUTSTANDING AMOUNTS & PAYMENT REMINDERS ═══════════ -->
+<div class="view hidden" id="v-outstanding">
+  <div class="sec">💰 Outstanding Amounts Summary</div>
+  <div class="card">
+    <div class="mg" style="margin-bottom:0">
+      <div class="met r">
+        <div class="mic">⚠️</div>
+        <div class="mlb">Total Outstanding</div>
+        <div class="mv r" id="os-total-amount">₹0</div>
+      </div>
+      <div class="met b">
+        <div class="mic">🚨</div>
+        <div class="mlb">Defaulting Flats</div>
+        <div class="mv b" id="os-defaulter-count">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">📋 Flats with Outstanding Amount</div>
+  <input id="os-search" type="search" placeholder="🔍 Search flat or owner…" oninput="loadOutstandingAmounts()" style="width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid var(--bdr);border-radius:10px;font-size:13px;box-sizing:border-box"/>
+  <div id="os-list"></div>
+
+  <div class="sec">📲 Payment Reminders</div>
+  <div class="card">
+    <div class="fg" style="margin-bottom:8px">
+      <label class="fl">Select Reminder Type</label>
+      <select id="os-reminder-type">
+        <option value="">— Select Type —</option>
+        <option value="whatsapp">📱 WhatsApp Message</option>
+        <option value="sms">💬 SMS Reminder</option>
+        <option value="email">📧 Email Notice</option>
+      </select>
+    </div>
+    <button class="btn btn-wa" style="margin-bottom:8px" onclick="startBulkReminders('whatsapp')">📱 Send WhatsApp to All Defaulters</button>
+    <button class="btn btn-r" style="margin-bottom:8px" onclick="startBulkReminders('sms')">💬 Send SMS to All Defaulters</button>
+    <div id="reminder-progress" class="hidden" style="margin-top:12px;padding:12px;background:#eef6ff;border-radius:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px">
+        <span id="reminder-count">Flat 1 of 0</span>
+        <span id="reminder-name" style="font-weight:700"></span>
+      </div>
+      <div class="row2">
+        <button class="btn btn-p btn-s" style="flex:1" id="reminder-send-btn" onclick="sendIndividualReminder()">📲 Send Now</button>
+        <button class="btn btn-o btn-s" style="flex:1;border-color:var(--err);color:var(--err)" onclick="skipReminder()">⏭️ Skip</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">💾 Export & Reports</div>
+  <div class="card">
+    <button class="btn btn-o" style="color:var(--P);margin-bottom:8px" onclick="exportOutstandingCSV()">📥 Export Outstanding List</button>
+    <button class="btn btn-p" onclick="printOutstandingReport()">🖨️ Print Report</button>
   </div>
 </div>
 
@@ -6763,6 +6842,7 @@ function goTab(id,btn){
   else if(id==='festivals')rFestivals();
   else if(id==='flat-expenses')initFlatExpensesTab();
   else if(id==='festival-contrib')initFestivalContribTab();
+  else if(id==='outstanding')initOutstandingTab();
   else if(id==='collection')rCollection();
   else if(id==='trends')rTrends();
   else if(id==='defaulters')rDefaulters();
@@ -10002,6 +10082,53 @@ function loadFlatExpenses(){
   });
   document.getElementById('fe-category-breakdown').innerHTML = catHtml || '<p style="color:var(--muted);font-size:12px">No expenses found</p>';
 
+  // Populate YoY category dropdown
+  var uniqueCategories = [];
+  (vpState.allExp||[]).forEach(e=>{
+    if(!uniqueCategories.includes(e.category)) uniqueCategories.push(e.category);
+  });
+  var catSel = document.getElementById('fe-yoy-category');
+  if(catSel){
+    catSel.innerHTML = '<option value="">— All Categories —</option>' +
+      uniqueCategories.sort().map(c=>`<option value="${c}">${c}</option>`).join('');
+  }
+
+  // Calculate outstanding amount
+  var flatIdx = parseInt(flatNum)-1;
+  var totalDue = 0, totalPaid = 0;
+  var months = (vpState.months||[]);
+  if(!months.length){
+    for(var i=11;i>=0;i--){
+      var d = new Date();
+      d.setMonth(d.getMonth()-i);
+      months.push(d.toISOString().slice(0,7));
+    }
+  }
+  months.forEach(function(mon){
+    var md = gmd(mon);
+    if(md.flats[flatIdx]){
+      totalDue += st.mf||0;
+      if(md.flats[flatIdx].paid) totalPaid += st.mf||0;
+    }
+  });
+
+  (vpState.allExp||[]).forEach(function(e){
+    if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
+  });
+
+  var outstanding = Math.max(0, totalDue - totalPaid);
+  document.getElementById('fe-outstanding').textContent = '₹' + outstanding.toLocaleString('en-IN');
+
+  if(outstanding > 0){
+    document.getElementById('fe-payment-status').textContent = '⏳ Pending ₹' + outstanding.toLocaleString('en-IN');
+    document.getElementById('fe-payment-status').style.background = 'var(--warnB)';
+    document.getElementById('fe-payment-status').style.color = 'var(--warn)';
+  }else{
+    document.getElementById('fe-payment-status').textContent = '✅ Paid';
+    document.getElementById('fe-payment-status').style.background = 'var(--okB)';
+    document.getElementById('fe-payment-status').style.color = 'var(--ok)';
+  }
+
   // Expense list
   var listHtml = allExp.map(e=>`
     <div class="erow">
@@ -10042,6 +10169,92 @@ function printFlatExpenses(){
   var flatSel = document.getElementById('fe-flat-select');
   if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
   window.print();
+}
+
+function loadYoYExpenses(){
+  var flatSel = document.getElementById('fe-flat-select');
+  var catSel = document.getElementById('fe-yoy-category');
+
+  if(!flatSel||!flatSel.value){
+    document.getElementById('fe-yoy-chart').innerHTML='<p style="color:var(--muted);font-size:12px">Please select a flat</p>';
+    return;
+  }
+
+  var flatNum = flatSel.value;
+  var selectedCat = catSel?catSel.value:'';
+
+  // Get all expenses for this flat
+  var allExp = (vpState.allExp||[]).filter(e=>e.flat===flatNum);
+
+  // Filter by category if selected
+  if(selectedCat){
+    allExp = allExp.filter(e=>e.category===selectedCat);
+  }
+
+  // Group by month
+  var byMonth = {};
+  var currentMonth = new Date().toISOString().slice(0,7);
+
+  // Initialize last 12 months
+  for(var i=11;i>=0;i--){
+    var d = new Date();
+    d.setMonth(d.getMonth()-i);
+    var mon = d.toISOString().slice(0,7);
+    byMonth[mon] = {month:mon, amount:0};
+  }
+
+  // Aggregate expenses
+  allExp.forEach(e=>{
+    var emon = (e.date||'').slice(0,7);
+    if(byMonth[emon]) byMonth[emon].amount += parseFloat(e.amount||0);
+  });
+
+  var months = Object.keys(byMonth).sort();
+  var amounts = months.map(m=>byMonth[m].amount);
+  var labels = months.map(m=>{
+    var d = new Date(m+'-01');
+    return d.toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
+  });
+
+  // Create simple chart HTML
+  var maxAmount = Math.max(...amounts, 1);
+  var chartHtml = '<div style="display:flex;align-items:flex-end;justify-content:space-around;height:160px;gap:6px;padding:12px;border:1px solid var(--bdr);border-radius:10px;background:var(--surf)">';
+
+  amounts.forEach(function(amt,idx){
+    var height = (amt/maxAmount)*140;
+    chartHtml += `<div style="display:flex;flex-direction:column;align-items:center;flex:1">
+      <div style="height:${height}px;background:var(--P);border-radius:4px;width:100%;min-height:4px" title="₹${amt.toLocaleString('en-IN')}"></div>
+      <div style="font-size:8px;color:var(--muted);margin-top:4px;text-align:center">${labels[idx]}</div>
+    </div>`;
+  });
+
+  chartHtml += '</div>';
+  chartHtml += '<div style="margin-top:8px;font-size:11px;color:var(--muted)">Max: ₹'+maxAmount.toLocaleString('en-IN')+'</div>';
+
+  if(!allExp.length){
+    chartHtml = '<p style="color:var(--muted);font-size:12px">No expenses found for this category</p>';
+  }
+
+  document.getElementById('fe-yoy-chart').innerHTML = chartHtml;
+}
+
+function sendPaymentReminder(){
+  var flatSel = document.getElementById('fe-flat-select');
+  if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
+
+  var flatNum = flatSel.value;
+  var flatIdx = parseInt(flatNum)-1;
+  var flat = (vpState.flats||FD||[])[flatIdx];
+  var phone = flat.phone||'';
+
+  var outstanding = document.getElementById('fe-outstanding').textContent;
+  var msg = '🏢 Payment Reminder – Flat '+flatNum+'\nOutstanding Amount: '+outstanding+'\n\nPlease pay at your earliest convenience.';
+
+  if(phone){
+    window.open('https://wa.me/'+phone.replace(/\D/g,'')+'?text='+encodeURIComponent(msg));
+  }else{
+    showToast('No phone number for Flat '+flatNum);
+  }
 }
 
 // ═══════════ FESTIVAL CONTRIBUTIONS BY FLAT ═══════════
@@ -10170,6 +10383,231 @@ function initFestivalContribTab(){
   }
 
   loadFestivalContributions();
+}
+
+// ═══════════ OUTSTANDING AMOUNTS & PAYMENT REMINDERS ═══════════
+function loadOutstandingAmounts(){
+  var searchVal = (document.getElementById('os-search')||{}).value||'';
+  var allFlats = vpState.flats||FD||[];
+
+  // Calculate outstanding for each flat
+  var outstanding = [];
+  allFlats.forEach(function(flat,idx){
+    var flatNo = idx+1;
+    var flatNum = 'Flat '+flatNo;
+    var totalDue = 0, totalPaid = 0;
+
+    // Calculate maintenance dues
+    var months = (vpState.months||[]);
+    if(!months.length){
+      for(var i=11;i>=0;i--){
+        var d = new Date();
+        d.setMonth(d.getMonth()-i);
+        months.push(d.toISOString().slice(0,7));
+      }
+    }
+
+    months.forEach(function(mon){
+      var md = gmd(mon);
+      if(md.flats[idx]){
+        totalDue += st.mf||0;
+        if(md.flats[idx].paid) totalPaid += st.mf||0;
+      }
+    });
+
+    // Add other expenses specific to flat
+    (vpState.allExp||[]).forEach(function(e){
+      if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
+    });
+
+    var dues = Math.max(0, totalDue - totalPaid);
+    if(dues > 0){
+      outstanding.push({
+        flatNo: flatNo,
+        name: flat.name||'—',
+        phone: flat.phone||'—',
+        dues: dues,
+        paid: totalPaid,
+        total: totalDue
+      });
+    }
+  });
+
+  // Apply search filter
+  var filtered = outstanding.filter(f=>
+    searchVal===''||f.flatNo.toString().includes(searchVal)||
+    f.name.toLowerCase().includes(searchVal.toLowerCase())
+  );
+
+  // Update summary
+  var totalOutstanding = outstanding.reduce((s,f)=>s+f.dues,0);
+  var defaultingCount = outstanding.length;
+  document.getElementById('os-total-amount').textContent = '₹'+totalOutstanding.toLocaleString('en-IN');
+  document.getElementById('os-defaulter-count').textContent = defaultingCount;
+
+  // Render list
+  var html = filtered.map(f=>`
+    <div class="frow" style="align-items:flex-start">
+      <div class="fi">
+        <div class="fnm">Flat ${f.flatNo}</div>
+        <div class="fno">${f.name}</div>
+        ${f.phone!=='—'?`<div class="fno" style="font-size:10px">📱 ${f.phone}</div>`:''}
+      </div>
+      <div class="fc" style="text-align:right">
+        <div style="font-size:13px;font-weight:800;color:var(--err)">₹${f.dues.toLocaleString('en-IN')}</div>
+        <span class="bdg bn" style="font-size:9px">⏳ Outstanding</span>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('os-list').innerHTML = html || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No outstanding amounts</div>';
+}
+
+var bulkReminderState = {active:false, flats:[], current:0, type:''};
+function startBulkReminders(type){
+  var outstandingFlats = [];
+  var allFlats = vpState.flats||FD||[];
+
+  allFlats.forEach(function(flat,idx){
+    var flatNo = idx+1;
+    var flatNum = 'Flat '+flatNo;
+    var totalDue = 0, totalPaid = 0;
+
+    var months = (vpState.months||[]);
+    if(!months.length){
+      for(var i=11;i>=0;i--){
+        var d = new Date();
+        d.setMonth(d.getMonth()-i);
+        months.push(d.toISOString().slice(0,7));
+      }
+    }
+
+    months.forEach(function(mon){
+      var md = gmd(mon);
+      if(md.flats[idx]){
+        totalDue += st.mf||0;
+        if(md.flats[idx].paid) totalPaid += st.mf||0;
+      }
+    });
+
+    (vpState.allExp||[]).forEach(function(e){
+      if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
+    });
+
+    var dues = Math.max(0, totalDue - totalPaid);
+    if(dues > 0){
+      outstandingFlats.push({
+        flatNo: flatNo,
+        name: flat.name||'—',
+        phone: flat.phone||'—',
+        dues: dues
+      });
+    }
+  });
+
+  if(!outstandingFlats.length){
+    showToast('No defaulting flats found');
+    return;
+  }
+
+  bulkReminderState = {active:true, flats:outstandingFlats, current:0, type:type};
+  document.getElementById('reminder-progress').classList.remove('hidden');
+  updateReminderUI();
+}
+
+function updateReminderUI(){
+  var state = bulkReminderState;
+  if(!state.active||state.current>=state.flats.length){
+    document.getElementById('reminder-progress').classList.add('hidden');
+    bulkReminderState.active = false;
+    return;
+  }
+  var flat = state.flats[state.current];
+  document.getElementById('reminder-count').textContent = 'Flat '+(state.current+1)+' of '+state.flats.length;
+  document.getElementById('reminder-name').textContent = 'Flat '+flat.flatNo+' – '+flat.name+' (₹'+flat.dues.toLocaleString('en-IN')+')';
+}
+
+function sendIndividualReminder(){
+  var state = bulkReminderState;
+  if(!state.active||state.current>=state.flats.length) return;
+
+  var flat = state.flats[state.current];
+  var msg = '🏢 Payment Reminder – Flat '+flat.flatNo+'\nOwner: '+flat.name+'\nOutstanding Amount: ₹'+flat.dues.toLocaleString('en-IN')+'\n\nPlease pay at your earliest convenience. Thank you!';
+
+  if(state.type==='whatsapp'){
+    if(flat.phone&&flat.phone!=='—'){
+      window.open('https://wa.me/'+flat.phone.replace(/\D/g,'')+'?text='+encodeURIComponent(msg));
+    }else{
+      showToast('No phone number available for Flat '+flat.flatNo);
+    }
+  }else if(state.type==='sms'){
+    if(flat.phone&&flat.phone!=='—'){
+      window.location.href='sms:'+flat.phone+'?body='+encodeURIComponent(msg);
+    }else{
+      showToast('No phone number available for Flat '+flat.flatNo);
+    }
+  }
+
+  state.current++;
+  updateReminderUI();
+}
+
+function skipReminder(){
+  var state = bulkReminderState;
+  state.current++;
+  updateReminderUI();
+}
+
+function exportOutstandingCSV(){
+  var allFlats = vpState.flats||FD||[];
+  var csv = 'Flat,Owner,Phone,Outstanding Amount,Total Due,Paid\n';
+
+  allFlats.forEach(function(flat,idx){
+    var flatNo = idx+1;
+    var flatNum = 'Flat '+flatNo;
+    var totalDue = 0, totalPaid = 0;
+
+    var months = (vpState.months||[]);
+    if(!months.length){
+      for(var i=11;i>=0;i--){
+        var d = new Date();
+        d.setMonth(d.getMonth()-i);
+        months.push(d.toISOString().slice(0,7));
+      }
+    }
+
+    months.forEach(function(mon){
+      var md = gmd(mon);
+      if(md.flats[idx]){
+        totalDue += st.mf||0;
+        if(md.flats[idx].paid) totalPaid += st.mf||0;
+      }
+    });
+
+    (vpState.allExp||[]).forEach(function(e){
+      if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
+    });
+
+    var dues = Math.max(0, totalDue - totalPaid);
+    if(dues > 0){
+      csv += 'Flat '+flatNo+',"'+flat.name+'","'+(flat.phone||'')+'",'+dues+','+totalDue+','+totalPaid+'\n';
+    }
+  });
+
+  var blob = new Blob([csv],{type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Outstanding_Amounts_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+}
+
+function printOutstandingReport(){
+  window.print();
+}
+
+function initOutstandingTab(){
+  loadOutstandingAmounts();
 }
 
   document.addEventListener('keydown',function(e){if(e.key==='Escape')vpCloseMenu();});
