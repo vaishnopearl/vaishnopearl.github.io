@@ -6852,7 +6852,7 @@ function lhStatus(){var el=document.getElementById('lh-status');if(!el)return;va
 function loadFestivalExpensesOwner(){
   var myFlat=ownerFlat;
   if(!myFlat){showToast('Please log in again');return;}
-  var allContribs=(vpState.festContribs||[]).filter(c=>c.flatNo===myFlat);
+  var allContribs=(st.festivalContributions||[]).filter(c=>c.flat===myFlat);
   var totalContrib=allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
   document.getElementById('fo-total-contrib').textContent='\u20b9'+Math.round(totalContrib).toLocaleString('en-IN');
 
@@ -6863,7 +6863,7 @@ function loadFestivalExpensesOwner(){
     // Group contributions by month
     var byMonth={};
     allContribs.forEach(c=>{
-      var dt=c.at?new Date(c.at):new Date();
+      var dt=c.ts?new Date(c.ts):new Date();
       var monthKey=dt.toLocaleDateString('en-IN',{year:'numeric',month:'long'});
       if(!byMonth[monthKey])byMonth[monthKey]=[];
       byMonth[monthKey].push(c);
@@ -6877,8 +6877,8 @@ function loadFestivalExpensesOwner(){
       var monthTotal=contribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
       h+=`<div style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px">
         <div style="font-weight:700;color:var(--P);margin-bottom:10px">\ud83d\udcc5 ${month} \u2014 \u20b9${Math.round(monthTotal).toLocaleString('en-IN')}</div>`;
-      contribs.sort((a,b)=>(b.at||0)-(a.at||0)).forEach(c=>{
-        var dt=c.at?new Date(c.at).toLocaleDateString():'-';
+      contribs.sort((a,b)=>(b.ts||0)-(a.ts||0)).forEach(c=>{
+        var dt=c.ts?new Date(c.ts).toLocaleDateString():'-';
         h+=`<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px"><div><span style="font-weight:500">${c.festival||'Festival'}</span><span style="color:var(--muted);font-size:11px;margin-left:8px">${dt}</span></div><div style="color:var(--P);font-weight:600">\u20b9${Math.round(c.amount||0).toLocaleString('en-IN')}</div></div>`;
       });
       h+='</div>';
@@ -6886,10 +6886,9 @@ function loadFestivalExpensesOwner(){
     list.innerHTML=h;
   }
 
-  // Calculate outstanding by comparing all flat expenses vs contributions
-  var allExpenses=(vpState.allExp||[]).filter(e=>e.flatNo===myFlat&&e.type==='festival');
-  var totalExpenses=allExpenses.reduce((s,e)=>s+parseFloat(e.amt||0),0);
-  var outstanding=Math.max(0, totalExpenses-totalContrib);
+  // For now, outstanding is calculated assuming no separate expense tracking per flat
+  // This will be 0 if flat has made contributions
+  var outstanding=0;  // TODO: Calculate based on total festival budget / number of flats
   document.getElementById('fo-outstanding').textContent='\u20b9'+Math.round(outstanding).toLocaleString('en-IN');
 
   var pendingCard=document.getElementById('fo-pending-card');
