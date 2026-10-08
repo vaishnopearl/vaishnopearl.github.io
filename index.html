@@ -10238,6 +10238,228 @@ document.addEventListener('visibilitychange',function(){
   }
 });
 
+// ═══════════════════════════════════════════════════════════
+// FESTIVAL CONTRIBUTIONS & FLAT EXPENSES TAB FUNCTIONS
+// ═══════════════════════════════════════════════════════════
+function loadFestivalContributions(){
+  var festSel = document.getElementById('fc-fest-select');
+  var searchVal = (document.getElementById('fcf-search')||{}).value||'';
+
+  if(!festSel||!festSel.value){
+    document.getElementById('fcf-list').innerHTML='<div class="card" style="text-align:center;padding:20px;color:var(--muted)">Please select a festival</div>';
+    return;
+  }
+
+  var festVal = festSel.value;
+
+  // Filter contributions - try different field name possibilities
+  var allContribs = (st.festivalContributions||[]).filter(c=>{
+    var festName = c.festival || c.festName || c.name || c.festival_name || '';
+    return festName === festVal;
+  });
+
+  // Filter expenses - try different field name possibilities
+  var allFestExp = (st.festivals||[]).filter(e=>{
+    var festName = e.festival || e.festName || e.name || e.festival_name || '';
+    return festName === festVal;
+  });
+
+  var totalCollected = allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
+  var totalExpense = allFestExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  var balance = totalCollected - totalExpense;
+
+  document.getElementById('fcf-total-collected').textContent = '₹' + Math.round(totalCollected).toLocaleString('en-IN');
+  document.getElementById('fcf-total-expense').textContent = '₹' + Math.round(totalExpense).toLocaleString('en-IN');
+  document.getElementById('fcf-balance').textContent = '₹' + Math.round(balance).toLocaleString('en-IN');
+
+  var allFlats = FD||[];
+  var contributed = allContribs.map(c=>c.flat).filter((v,i,a)=>a.indexOf(v)===i);
+  var pending = allFlats.length - contributed.length;
+
+  document.getElementById('fcf-contributed-count').textContent = contributed.length + '/' + allFlats.length;
+  document.getElementById('fcf-pending-count').textContent = pending;
+
+  // Contribution list - note: st.festivalContributions uses 'flat' not 'flatNo', and 'ts' for timestamp
+  var listHtml = allContribs.filter(c=>
+    searchVal==='' || c.flat.toString().includes(searchVal) || (c.name||'').toLowerCase().includes(searchVal.toLowerCase())
+  ).map(c=>`
+    <div class="frow">
+      <div class="fi">
+        <div class="fno">Flat ${c.flat}</div>
+        <div class="fnm">${c.name||'—'}</div>
+      </div>
+      <div class="fc">
+        <div class="bdg bp">✅ Contributed</div>
+        <div style="font-weight:700;color:var(--P)">₹${Math.round(parseFloat(c.amount||0)).toLocaleString('en-IN')}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('fcf-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No contributions yet</div>';
+
+  // Expense list - st.festivals uses 'ts' for timestamp, not 'date'
+  var expHtml = allFestExp.map(e=>`
+    <div class="sr">
+      <span class="slb">${e.item||'Expense'} (${new Date(e.ts||Date.now()).toLocaleDateString('en-IN')})</span>
+      <span><b>₹${Math.round(parseFloat(e.amount||0)).toLocaleString('en-IN')}</b></span>
+    </div>
+  `).join('');
+  document.getElementById('fcf-expense-list').innerHTML = expHtml || '<p style="font-size:12px;color:var(--muted)">No expenses recorded</p>';
+}
+
+function exportFestivalContribCSV(){
+  var festSel = document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){alert('Please select a festival');return;}
+  var csv = 'Flat No,Owner Name,Amount Contributed\n';
+  var contribs = (st.festivalContributions||[]).filter(c=>c.festival===festSel.value);
+  contribs.forEach(c=>csv+='Flat '+c.flat+','+(c.name||'')+','+parseFloat(c.amount||0)+'\n');
+  var blob = new Blob([csv],{type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = festSel.value+'_Contributions.csv';
+  a.click();
+}
+
+function sendFestivalContribWhatsApp(){
+  var festSel = document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){alert('Please select a festival');return;}
+  var msg = festSel.value+' Contributions: '+document.getElementById('fcf-total-collected').textContent;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+
+function printFestivalContrib(){
+  var festSel = document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){alert('Please select a festival');return;}
+  window.print();
+}
+
+function addFestivalContribution(){
+  // Validate board member access
+  if(!canEdit()){showToast('Board access only for your role');return;}
+
+  var festSel = document.getElementById('fc-fest-select');
+  var flatSel = document.getElementById('fc-flat-select');
+  var amountInp = document.getElementById('fc-amount');
+  var modeSel = document.getElementById('fc-mode');
+
+  var festival = (festSel&&festSel.value||'').trim();
+  var flatNo = flatSel?flatSel.value:'';
+  var amount = parseFloat(amountInp?amountInp.value:0)||0;
+  var mode = modeSel?modeSel.value:'Cash';
+
+  // Validation
+  if(!festival){showToast('Please select a festival');return;}
+  if(!flatNo){showToast('Please select a flat');return;}
+  if(!amount||amount<=0){showToast('Please enter a valid amount');return;}
+
+  // Get flat details
+  var flat = (FD||[]).find(f=>f.no===flatNo);
+
+  // Add contribution
+  st.festivalContributions = st.festivalContributions||[];
+  st.festivalContributions.unshift({
+    id: Date.now(),
+    festival: festival,
+    flat: flatNo,
+    name: flat?flat.name:'',
+    amount: amount,
+    mode: mode,
+    ts: Date.now()
+  });
+
+  // Save and refresh
+  sv();
+
+  // Clear form
+  if(amountInp) amountInp.value = '';
+  if(flatSel) flatSel.value = '';
+
+  // Refresh display
+  loadFestivalContributions();
+
+  showToast('✅ Contribution recorded — Flat '+flatNo+' · ₹'+fmt(amount));
+}
+
+function initFestivalContribAddForm(){
+  // Populate flat selector for adding contributions
+  var flatSel = document.getElementById('fc-flat-select');
+  if(flatSel){
+    var allFlats = FD||[];
+    flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
+      allFlats.map(f=>`<option value="${f.no}">Flat ${f.no} ${f.name?'('+f.name+')':''}</option>`).join('');
+  }
+}
+
+function initFlatExpensesTab(){
+  // Populate flat select
+  var flatSel = document.getElementById('fe-flat-select');
+  if(flatSel){
+    var allFlats = FD||[];
+    flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
+      allFlats.map((f,i)=>`<option value="${i+1}">Flat ${i+1} ${f.name?'('+f.name+')':''}</option>`).join('');
+  }
+
+  // Populate month select
+  var monthSel = document.getElementById('fe-month-select');
+  if(monthSel){
+    var months = [];
+    for(var i=11;i>=0;i--){
+      var d = new Date();
+      d.setMonth(d.getMonth()-i);
+      var ym = d.toISOString().slice(0,7);
+      var ml = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      months.push({val:ym,label:ml[d.getMonth()]+' '+d.getFullYear()});
+    }
+    monthSel.innerHTML = months.map(m=>`<option value="${m.val}">${m.label}</option>`).join('');
+  }
+
+  loadFlatExpenses();
+}
+
+function initFestivalContribTab(){
+  // Populate festival select - read from correct data source (st, not vpState)
+  var festSel = document.getElementById('fc-fest-select');
+  if(festSel){
+    var allFestivals = [];
+
+    // Collect from st.festivals (festival expenses)
+    if(st.festivals && Array.isArray(st.festivals)){
+      st.festivals.forEach(e=>{
+        // Try different field names for festival
+        var festName = e.festival || e.festName || e.name || e.festival_name || '';
+        if(festName && !allFestivals.includes(festName)) {
+          allFestivals.push(festName);
+        }
+      });
+    }
+
+    // Collect from st.festivalContributions (contributions)
+    if(st.festivalContributions && Array.isArray(st.festivalContributions)){
+      st.festivalContributions.forEach(c=>{
+        var festName = c.festival || c.festName || c.name || c.festival_name || '';
+        if(festName && !allFestivals.includes(festName)) {
+          allFestivals.push(festName);
+        }
+      });
+    }
+
+    // Build dropdown
+    if(allFestivals.length > 0){
+      festSel.innerHTML = '<option value="">— Select Festival —</option>' +
+        allFestivals.sort().map(f=>`<option value="${f}">${f}</option>`).join('');
+    } else {
+      // If no festivals found, show message
+      festSel.innerHTML = '<option value="">— No festivals found —</option>';
+      console.warn('No festivals found in st.festivals or st.festivalContributions');
+      console.log('st.festivals:', st.festivals);
+      console.log('st.festivalContributions:', st.festivalContributions);
+    }
+  }
+
+  loadFestivalContributions();
+  initFestivalContribAddForm();
+}
+
 </script>
 <script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('gone');},11800);</script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
@@ -10470,227 +10692,6 @@ function sendPaymentReminder(){
   }else{
     showToast('No phone number for Flat '+flatNum);
   }
-}
-
-// ═══════════ FESTIVAL CONTRIBUTIONS BY FLAT ═══════════
-function loadFestivalContributions(){
-  var festSel = document.getElementById('fc-fest-select');
-  var searchVal = (document.getElementById('fcf-search')||{}).value||'';
-
-  if(!festSel||!festSel.value){
-    document.getElementById('fcf-list').innerHTML='<div class="card" style="text-align:center;padding:20px;color:var(--muted)">Please select a festival</div>';
-    return;
-  }
-
-  var festVal = festSel.value;
-
-  // Filter contributions - try different field name possibilities
-  var allContribs = (st.festivalContributions||[]).filter(c=>{
-    var festName = c.festival || c.festName || c.name || c.festival_name || '';
-    return festName === festVal;
-  });
-
-  // Filter expenses - try different field name possibilities
-  var allFestExp = (st.festivals||[]).filter(e=>{
-    var festName = e.festival || e.festName || e.name || e.festival_name || '';
-    return festName === festVal;
-  });
-
-  var totalCollected = allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
-  var totalExpense = allFestExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
-  var balance = totalCollected - totalExpense;
-
-  document.getElementById('fcf-total-collected').textContent = '₹' + Math.round(totalCollected).toLocaleString('en-IN');
-  document.getElementById('fcf-total-expense').textContent = '₹' + Math.round(totalExpense).toLocaleString('en-IN');
-  document.getElementById('fcf-balance').textContent = '₹' + Math.round(balance).toLocaleString('en-IN');
-
-  var allFlats = FD||[];
-  var contributed = allContribs.map(c=>c.flat).filter((v,i,a)=>a.indexOf(v)===i);
-  var pending = allFlats.length - contributed.length;
-
-  document.getElementById('fcf-contributed-count').textContent = contributed.length + '/' + allFlats.length;
-  document.getElementById('fcf-pending-count').textContent = pending;
-
-  // Contribution list - note: st.festivalContributions uses 'flat' not 'flatNo', and 'ts' for timestamp
-  var listHtml = allContribs.filter(c=>
-    searchVal==='' || c.flat.toString().includes(searchVal) || (c.name||'').toLowerCase().includes(searchVal.toLowerCase())
-  ).map(c=>`
-    <div class="frow">
-      <div class="fi">
-        <div class="fno">Flat ${c.flat}</div>
-        <div class="fnm">${c.name||'—'}</div>
-      </div>
-      <div class="fc">
-        <div class="bdg bp">✅ Contributed</div>
-        <div style="font-weight:700;color:var(--P)">₹${Math.round(parseFloat(c.amount||0)).toLocaleString('en-IN')}</div>
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('fcf-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No contributions yet</div>';
-
-  // Expense list - st.festivals uses 'ts' for timestamp, not 'date'
-  var expHtml = allFestExp.map(e=>`
-    <div class="sr">
-      <span class="slb">${e.item||'Expense'} (${new Date(e.ts||Date.now()).toLocaleDateString('en-IN')})</span>
-      <span><b>₹${Math.round(parseFloat(e.amount||0)).toLocaleString('en-IN')}</b></span>
-    </div>
-  `).join('');
-  document.getElementById('fcf-expense-list').innerHTML = expHtml || '<p style="font-size:12px;color:var(--muted)">No expenses recorded</p>';
-}
-
-function exportFestivalContribCSV(){
-  var festSel = document.getElementById('fc-fest-select');
-  if(!festSel||!festSel.value){alert('Please select a festival');return;}
-  var csv = 'Flat No,Owner Name,Amount Contributed\\n';
-  var contribs = (st.festivalContributions||[]).filter(c=>c.festival===festSel.value);
-  contribs.forEach(c=>csv+='Flat '+c.flat+','+(c.name||'')+','+parseFloat(c.amount||0)+'\n');
-  var blob = new Blob([csv],{type:'text/csv'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = festSel.value+'_Contributions.csv';
-  a.click();
-}
-
-function sendFestivalContribWhatsApp(){
-  var festSel = document.getElementById('fc-fest-select');
-  if(!festSel||!festSel.value){alert('Please select a festival');return;}
-  var msg = festSel.value+' Contributions: '+document.getElementById('fcf-total-collected').textContent;
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
-}
-
-function printFestivalContrib(){
-  var festSel = document.getElementById('fc-fest-select');
-  if(!festSel||!festSel.value){alert('Please select a festival');return;}
-  window.print();
-}
-
-function addFestivalContribution(){
-  // Validate board member access
-  if(!canEdit()){showToast('Board access only for your role');return;}
-
-  var festSel = document.getElementById('fc-fest-select');
-  var flatSel = document.getElementById('fc-flat-select');
-  var amountInp = document.getElementById('fc-amount');
-  var modeSel = document.getElementById('fc-mode');
-
-  var festival = (festSel&&festSel.value||'').trim();
-  var flatNo = flatSel?flatSel.value:'';
-  var amount = parseFloat(amountInp?amountInp.value:0)||0;
-  var mode = modeSel?modeSel.value:'Cash';
-
-  // Validation
-  if(!festival){showToast('Please select a festival');return;}
-  if(!flatNo){showToast('Please select a flat');return;}
-  if(!amount||amount<=0){showToast('Please enter a valid amount');return;}
-
-  // Get flat details
-  var flat = (FD||[]).find(f=>f.no===flatNo);
-
-  // Add contribution
-  st.festivalContributions = st.festivalContributions||[];
-  st.festivalContributions.unshift({
-    id: Date.now(),
-    festival: festival,
-    flat: flatNo,
-    name: flat?flat.name:'',
-    amount: amount,
-    mode: mode,
-    ts: Date.now()
-  });
-
-  // Save and refresh
-  sv();
-
-  // Clear form
-  if(amountInp) amountInp.value = '';
-  if(flatSel) flatSel.value = '';
-
-  // Refresh display
-  loadFestivalContributions();
-
-  showToast('✅ Contribution recorded — Flat '+flatNo+' · ₹'+fmt(amount));
-}
-
-function initFestivalContribAddForm(){
-  // Populate flat selector for adding contributions
-  var flatSel = document.getElementById('fc-flat-select');
-  if(flatSel){
-    var allFlats = FD||[];
-    flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
-      allFlats.map(f=>`<option value="${f.no}">Flat ${f.no} ${f.name?'('+f.name+')':''}</option>`).join('');
-  }
-}
-
-// ═══════════ INITIALIZATION FOR NEW TABS ═══════════
-function initFlatExpensesTab(){
-  // Populate flat select
-  var flatSel = document.getElementById('fe-flat-select');
-  if(flatSel){
-    var allFlats = FD||[];
-    flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
-      allFlats.map((f,i)=>`<option value="${i+1}">Flat ${i+1} ${f.name?'('+f.name+')':''}</option>`).join('');
-  }
-
-  // Populate month select
-  var monthSel = document.getElementById('fe-month-select');
-  if(monthSel){
-    var months = [];
-    for(var i=11;i>=0;i--){
-      var d = new Date();
-      d.setMonth(d.getMonth()-i);
-      var ym = d.toISOString().slice(0,7);
-      var ml = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      months.push({val:ym,label:ml[d.getMonth()]+' '+d.getFullYear()});
-    }
-    monthSel.innerHTML = months.map(m=>`<option value="${m.val}">${m.label}</option>`).join('');
-  }
-
-  loadFlatExpenses();
-}
-
-function initFestivalContribTab(){
-  // Populate festival select - read from correct data source (st, not vpState)
-  var festSel = document.getElementById('fc-fest-select');
-  if(festSel){
-    var allFestivals = [];
-
-    // Collect from st.festivals (festival expenses)
-    if(st.festivals && Array.isArray(st.festivals)){
-      st.festivals.forEach(e=>{
-        // Try different field names for festival
-        var festName = e.festival || e.festName || e.name || e.festival_name || '';
-        if(festName && !allFestivals.includes(festName)) {
-          allFestivals.push(festName);
-        }
-      });
-    }
-
-    // Collect from st.festivalContributions (contributions)
-    if(st.festivalContributions && Array.isArray(st.festivalContributions)){
-      st.festivalContributions.forEach(c=>{
-        var festName = c.festival || c.festName || c.name || c.festival_name || '';
-        if(festName && !allFestivals.includes(festName)) {
-          allFestivals.push(festName);
-        }
-      });
-    }
-
-    // Build dropdown
-    if(allFestivals.length > 0){
-      festSel.innerHTML = '<option value="">— Select Festival —</option>' +
-        allFestivals.sort().map(f=>`<option value="${f}">${f}</option>`).join('');
-    } else {
-      // If no festivals found, show message
-      festSel.innerHTML = '<option value="">— No festivals found —</option>';
-      console.warn('No festivals found in st.festivals or st.festivalContributions');
-      console.log('st.festivals:', st.festivals);
-      console.log('st.festivalContributions:', st.festivalContributions);
-    }
-  }
-
-  loadFestivalContributions();
-  initFestivalContribAddForm();
 }
 
 // ═══════════ DEBUG DIAGNOSTICS ═══════════
