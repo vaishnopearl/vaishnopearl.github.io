@@ -10459,8 +10459,18 @@ function loadFestivalContributions(){
   }
 
   var festVal = festSel.value;
-  var allContribs = (st.festivalContributions||[]).filter(c=>c.festival===festVal);
-  var allFestExp = (st.festivals||[]).filter(e=>e.festival===festVal);
+
+  // Filter contributions - try different field name possibilities
+  var allContribs = (st.festivalContributions||[]).filter(c=>{
+    var festName = c.festival || c.festName || c.name || c.festival_name || '';
+    return festName === festVal;
+  });
+
+  // Filter expenses - try different field name possibilities
+  var allFestExp = (st.festivals||[]).filter(e=>{
+    var festName = e.festival || e.festName || e.name || e.festival_name || '';
+    return festName === festVal;
+  });
 
   var totalCollected = allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
   var totalExpense = allFestExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
@@ -10563,14 +10573,39 @@ function initFestivalContribTab(){
   var festSel = document.getElementById('fc-fest-select');
   if(festSel){
     var allFestivals = [];
-    (st.festivals||[]).forEach(e=>{
-      if(!allFestivals.includes(e.festival)) allFestivals.push(e.festival);
-    });
-    (st.festivalContributions||[]).forEach(c=>{
-      if(!allFestivals.includes(c.festival)) allFestivals.push(c.festival);
-    });
-    festSel.innerHTML = '<option value="">— Select Festival —</option>' +
-      allFestivals.sort().map(f=>`<option value="${f}">${f}</option>`).join('');
+
+    // Collect from st.festivals (festival expenses)
+    if(st.festivals && Array.isArray(st.festivals)){
+      st.festivals.forEach(e=>{
+        // Try different field names for festival
+        var festName = e.festival || e.festName || e.name || e.festival_name || '';
+        if(festName && !allFestivals.includes(festName)) {
+          allFestivals.push(festName);
+        }
+      });
+    }
+
+    // Collect from st.festivalContributions (contributions)
+    if(st.festivalContributions && Array.isArray(st.festivalContributions)){
+      st.festivalContributions.forEach(c=>{
+        var festName = c.festival || c.festName || c.name || c.festival_name || '';
+        if(festName && !allFestivals.includes(festName)) {
+          allFestivals.push(festName);
+        }
+      });
+    }
+
+    // Build dropdown
+    if(allFestivals.length > 0){
+      festSel.innerHTML = '<option value="">— Select Festival —</option>' +
+        allFestivals.sort().map(f=>`<option value="${f}">${f}</option>`).join('');
+    } else {
+      // If no festivals found, show message
+      festSel.innerHTML = '<option value="">— No festivals found —</option>';
+      console.warn('No festivals found in st.festivals or st.festivalContributions');
+      console.log('st.festivals:', st.festivals);
+      console.log('st.festivalContributions:', st.festivalContributions);
+    }
   }
 
   loadFestivalContributions();
