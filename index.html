@@ -1597,6 +1597,30 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div class="mv b" id="fcf-balance">₹0</div>
   </div>
 
+  <div class="sec">➕ Add Contribution</div>
+  <div class="card">
+    <div class="row2">
+      <div class="fg" style="flex:1">
+        <label class="fl">Select Flat</label>
+        <select id="fc-flat-select"></select>
+      </div>
+      <div class="fg" style="flex:1">
+        <label class="fl">Amount (₹)</label>
+        <input type="number" id="fc-amount" placeholder="e.g. 500" min="0"/>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Payment Mode</label>
+      <select id="fc-mode">
+        <option value="Cash">💵 Cash</option>
+        <option value="UPI">📱 UPI</option>
+        <option value="Bank">🏦 Bank Transfer</option>
+        <option value="Cheque">📄 Cheque</option>
+      </select>
+    </div>
+    <button class="btn btn-o" style="width:100%;margin-top:10px" onclick="addFestivalContribution()">➕ Add Contribution</button>
+  </div>
+
   <div class="sec">👥 Contribution Status</div>
   <div class="card">
     <div class="mg" style="margin-bottom:0">
@@ -10541,6 +10565,63 @@ function printFestivalContrib(){
   window.print();
 }
 
+function addFestivalContribution(){
+  // Validate board member access
+  if(!canEdit()){showToast('Board access only for your role');return;}
+
+  var festSel = document.getElementById('fc-fest-select');
+  var flatSel = document.getElementById('fc-flat-select');
+  var amountInp = document.getElementById('fc-amount');
+  var modeSel = document.getElementById('fc-mode');
+
+  var festival = (festSel&&festSel.value||'').trim();
+  var flatNo = flatSel?flatSel.value:'';
+  var amount = parseFloat(amountInp?amountInp.value:0)||0;
+  var mode = modeSel?modeSel.value:'Cash';
+
+  // Validation
+  if(!festival){showToast('Please select a festival');return;}
+  if(!flatNo){showToast('Please select a flat');return;}
+  if(!amount||amount<=0){showToast('Please enter a valid amount');return;}
+
+  // Get flat details
+  var flat = (FD||[]).find(f=>f.no===flatNo);
+
+  // Add contribution
+  st.festivalContributions = st.festivalContributions||[];
+  st.festivalContributions.unshift({
+    id: Date.now(),
+    festival: festival,
+    flat: flatNo,
+    name: flat?flat.name:'',
+    amount: amount,
+    mode: mode,
+    ts: Date.now()
+  });
+
+  // Save and refresh
+  sv();
+
+  // Clear form
+  if(amountInp) amountInp.value = '';
+  if(flatSel) flatSel.value = '';
+
+  // Refresh display
+  loadFestivalContributions();
+
+  showToast('✅ Contribution recorded — Flat '+flatNo+' · ₹'+fmt(amount));
+}
+
+function initFestivalContribAddForm(){
+  // Populate flat selector for adding contributions
+  var flatSel = document.getElementById('fc-flat-select');
+  if(flatSel){
+    var allFlats = FD||[];
+    flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
+      allFlats.map(f=>`<option value="${f.no}">Flat ${f.no} ${f.name?'('+f.name+')':''}</option>`).join('');
+  }
+}
+
 // ═══════════ INITIALIZATION FOR NEW TABS ═══════════
 function initFlatExpensesTab(){
   // Populate flat select
@@ -10609,6 +10690,7 @@ function initFestivalContribTab(){
   }
 
   loadFestivalContributions();
+  initFestivalContribAddForm();
 }
 
 // ═══════════ DEBUG DIAGNOSTICS ═══════════
