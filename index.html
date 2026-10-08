@@ -600,6 +600,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <button class="tab" onclick="goTab('polls',this)">🗳️ Polls</button>
   <button class="tab" onclick="goTab('agm',this)">🏛️ AGM</button>
   <button class="tab" onclick="goTab('fest-exp',this)">🎊 Festival Expenses</button>
+  <button class="tab" onclick="goTab('my-fest-contrib',this)">🎁 My Contributions</button>
 </div>
 
 <!-- ═══════════ DASHBOARD (board only) ═══════════ -->
@@ -1915,6 +1916,32 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div class="ctitle">⏳ Outstanding Contributions to Pay</div>
     <div id="fo-pending-list" style="margin-bottom:10px"></div>
     <button class="btn btn-p" onclick="showPaymentOptions()">💳 Make Payment</button>
+  </div>
+</div>
+
+<!-- FLAT OWNER: MY FESTIVAL CONTRIBUTIONS -->
+<div class="view hidden" id="v-my-fest-contrib">
+  <div class="sec">🎁 My Festival Contributions</div>
+  <div class="card">
+    <div class="ctitle">📊 Your Contribution Summary</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:var(--ok);color:#fff;padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;opacity:0.9">Total Paid</div>
+        <div style="font-size:18px;font-weight:700" id="mfc-total-paid">₹0</div>
+      </div>
+      <div style="background:#f59e0b;color:#fff;padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:11px;opacity:0.9">Festivals</div>
+        <div style="font-size:18px;font-weight:700" id="mfc-festivals-count">0</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">💝 Contribution History</div>
+    <div id="mfc-contrib-history" style="font-size:13px;line-height:1.8"></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">📋 Festival-wise Breakdown</div>
+    <div id="mfc-festival-breakdown" style="font-size:12px;line-height:1.8"></div>
   </div>
 </div>
 
@@ -7056,6 +7083,7 @@ function goTab(id,btn){
   else if(id==='festivals')rFestivals();
   else if(id==='flat-expenses')initFlatExpensesTab();
   else if(id==='festival-contrib')initFestivalContribTab();
+  else if(id==='my-fest-contrib')loadMyFestivalContrib();
   else if(id==='outstanding')initOutstandingTab();
   else if(id==='collection')rCollection();
   else if(id==='trends')rTrends();
@@ -10143,6 +10171,52 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;
 function doInstall(){if(dp){dp.prompt();dp.userChoice.then(()=>{dp=null;});}}
 const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
 const isSA=window.matchMedia('(display-mode: standalone)').matches;
+// ═══════════════════════════════════════════════════════════
+// CROSS-ROLE DATA SYNCHRONIZATION
+// ═══════════════════════════════════════════════════════════
+// Listen for localStorage changes from other tabs/windows
+// When board members update data, flat owners see changes instantly
+window.addEventListener('storage', function(e) {
+  if (e.key === 'vp5') {
+    try {
+      // Reload state from localStorage
+      st = JSON.parse(e.newValue || '{}');
+      FD = st.flatDirectory || FD;
+
+      // Auto-refresh current view if a flat owner is viewing Festival Contributions
+      var currentView = document.querySelector('.view:not(.hidden)');
+      if (currentView) {
+        var viewId = currentView.id;
+
+        // Auto-refresh Festival Contributions if visible
+        if (viewId === 'v-festival-contrib') {
+          try { loadFestivalContributions(); } catch(err) {}
+        }
+
+        // Auto-refresh other data-heavy views
+        if (viewId === 'v-ledger') {
+          try { rLedger(); } catch(err) {}
+        }
+        if (viewId === 'v-exp') {
+          try { rExp(); } catch(err) {}
+        }
+        if (viewId === 'v-myflat') {
+          try { rMyFlat(); } catch(err) {}
+        }
+      }
+
+      // Show subtle notification that data was synced
+      try {
+        if (!document.hidden) {
+          showToast('↻ Data synced from board updates');
+        }
+      } catch(e) {}
+    } catch(err) {
+      console.error('Sync error:', err);
+    }
+  }
+});
+
 window.addEventListener('DOMContentLoaded',()=>{
   try{vpInitDarkMode();}catch(e){}
   try{vpWarmVoices();}catch(e){}
@@ -10458,6 +10532,69 @@ function initFestivalContribTab(){
 
   loadFestivalContributions();
   initFestivalContribAddForm();
+}
+
+// ═══════════ FLAT OWNER: MY FESTIVAL CONTRIBUTIONS ═══════════
+function loadMyFestivalContrib(){
+  if(!ownerFlat){
+    var msg = document.getElementById('mfc-contrib-history');
+    if(msg) msg.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">Please log in as a flat owner to view contributions</div>';
+    return;
+  }
+
+  // Get all contributions for this flat
+  var myContribs = (st.festivalContributions||[]).filter(c => c.flat === ownerFlat);
+
+  // Get unique festivals with totals
+  var festivals = {};
+  myContribs.forEach(c => {
+    var festName = c.festival || 'Festival';
+    if(!festivals[festName]) {
+      festivals[festName] = { total: 0, count: 0, entries: [] };
+    }
+    festivals[festName].total += parseFloat(c.amount||0);
+    festivals[festName].count += 1;
+    festivals[festName].entries.push(c);
+  });
+
+  // Display summary
+  var totalPaid = myContribs.reduce((sum, c) => sum + parseFloat(c.amount||0), 0);
+  document.getElementById('mfc-total-paid').textContent = '₹' + Math.round(totalPaid).toLocaleString('en-IN');
+  document.getElementById('mfc-festivals-count').textContent = Object.keys(festivals).length;
+
+  // Display contribution history
+  if(myContribs.length === 0){
+    document.getElementById('mfc-contrib-history').innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">No contributions recorded yet</div>';
+  } else {
+    var historyHtml = myContribs.sort((a,b) => (b.ts||0) - (a.ts||0)).map(c => {
+      var dt = c.ts ? new Date(c.ts).toLocaleDateString('en-IN') : '-';
+      var mode = c.mode || 'Cash';
+      return `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid var(--bdr)">
+        <div>
+          <div style="font-weight:600">${c.festival||'Festival'}</div>
+          <div style="font-size:11px;color:var(--muted)">${dt} · ${mode}</div>
+        </div>
+        <div style="font-weight:700;color:var(--P)">₹${Math.round(parseFloat(c.amount||0)).toLocaleString('en-IN')}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('mfc-contrib-history').innerHTML = historyHtml;
+  }
+
+  // Display festival-wise breakdown
+  if(Object.keys(festivals).length === 0){
+    document.getElementById('mfc-festival-breakdown').innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">No festivals yet</div>';
+  } else {
+    var breakdownHtml = Object.entries(festivals).map(([festName, data]) => {
+      return `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid var(--bdr)">
+        <div>
+          <div style="font-weight:600">${festName}</div>
+          <div style="font-size:11px;color:var(--muted)">${data.count} contribution(s)</div>
+        </div>
+        <div style="font-weight:700;color:var(--P)">₹${Math.round(data.total).toLocaleString('en-IN')}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('mfc-festival-breakdown').innerHTML = breakdownHtml;
+  }
 }
 
 </script>
