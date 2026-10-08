@@ -1663,6 +1663,8 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div style="margin-bottom:15px">
       <button class="btn btn-o" style="width:100%;margin-bottom:8px" onclick="vpShowFestivalData()">📊 Show Festival Data in Storage</button>
       <button class="btn btn-o" style="width:100%;margin-bottom:8px" onclick="vpShowContributionData()">💰 Show Festival Contributions Data</button>
+      <button class="btn btn-o" style="width:100%;margin-bottom:8px" onclick="debugCheckAllData()">🔍 Check All Festival Data</button>
+      <button class="btn btn-g" style="width:100%;margin-bottom:8px" onclick="debugAddSampleFestivals()">➕ Add Sample Festivals (Testing)</button>
       <button class="btn btn-p" style="width:100%" onclick="vpRefreshFestivalDropdown()">🔄 Refresh Festival Dropdown NOW</button>
     </div>
   </div>
@@ -10535,6 +10537,83 @@ function initFestivalContribTab(){
 }
 
 // ═══════════ FLAT OWNER: MY FESTIVAL CONTRIBUTIONS ═══════════
+// ═══════════ QUICK DEBUG: CHECK ALL DATA ═══════════
+function debugCheckAllData(){
+  console.log('🔍 FULL STATE DUMP:');
+  console.log('st.festivals:', JSON.stringify(st.festivals || [], null, 2));
+  console.log('st.festivalContributions:', JSON.stringify(st.festivalContributions || [], null, 2));
+  console.log('st.months keys:', Object.keys(st.months || {}).slice(-3));
+  console.log('Full state size:', JSON.stringify(st).length, 'bytes');
+
+  var msg = 'DATA CHECK:\n';
+  msg += '✓ Festivals: ' + (st.festivals?.length || 0) + '\n';
+  msg += '✓ Contributions: ' + (st.festivalContributions?.length || 0) + '\n';
+  msg += '✓ Months: ' + Object.keys(st.months || {}).length + '\n';
+  showToast(msg);
+}
+
+function debugAddSampleFestivals(){
+  // Add sample festival expenses
+  st.festivals = st.festivals || [];
+  st.festivals.push({
+    id: Date.now() + 1,
+    festival: 'Diwali 2026',
+    item: 'Decorations',
+    amount: 5000,
+    ts: Date.now() - 86400000
+  });
+  st.festivals.push({
+    id: Date.now() + 2,
+    festival: 'Diwali 2026',
+    item: 'Sweets',
+    amount: 3000,
+    ts: Date.now() - 43200000
+  });
+  st.festivals.push({
+    id: Date.now() + 3,
+    festival: 'Holi 2027',
+    item: 'Colors & Water',
+    amount: 2000,
+    ts: Date.now()
+  });
+
+  // Add sample contributions
+  st.festivalContributions = st.festivalContributions || [];
+  st.festivalContributions.push({
+    id: Date.now() + 100,
+    festival: 'Diwali 2026',
+    flat: 'A1',
+    name: 'Owner A1',
+    amount: 2000,
+    mode: 'UPI',
+    ts: Date.now() - 72000000
+  });
+  st.festivalContributions.push({
+    id: Date.now() + 101,
+    festival: 'Diwali 2026',
+    flat: 'A2',
+    name: 'Owner A2',
+    amount: 1500,
+    mode: 'Cash',
+    ts: Date.now() - 60000000
+  });
+  st.festivalContributions.push({
+    id: Date.now() + 102,
+    festival: 'Holi 2027',
+    flat: 'A1',
+    name: 'Owner A1',
+    amount: 1000,
+    mode: 'Bank',
+    ts: Date.now() - 3600000
+  });
+
+  sv();
+  showToast('✅ Sample festivals & contributions added!');
+
+  // Refresh the view if it's open
+  try { initFestivalContribTab(); } catch(e) {}
+}
+
 function loadMyFestivalContrib(){
   if(!ownerFlat){
     var msg = document.getElementById('mfc-contrib-history');
