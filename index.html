@@ -4289,13 +4289,44 @@ function mergeData(ev){
   rd.readAsText(f);
 }
 function cloudStatus(msg,ok){var el=document.getElementById('cloud-status');if(el){el.textContent=msg;el.style.color=ok===false?'var(--err)':(ok===true?'var(--ok)':'var(--muted)');}}
+// ---- Chunked cloud storage: Firestore limits one field to ~1MB, so big data is split across docs ----
+var VP_CHUNK=300000; // chars per chunk (worst case 3 bytes/char = 900KB, under the 1,048,487-byte limit)
+function vpCloudWrite(meta){
+  // meta = {data:<json string>, updatedAt, updatedBy, device}; returns a Promise
+  var s=meta.data||'';
+  var col=vpDB.collection('vaishnopearl');
+  if(s.length<=VP_CHUNK){
+    return col.doc('society').set({data:s,chunks:0,updatedAt:meta.updatedAt,updatedBy:meta.updatedBy,device:meta.device});
+  }
+  var n=Math.ceil(s.length/VP_CHUNK);
+  var batch=vpDB.batch();
+  for(var i=0;i<n;i++){
+    batch.set(col.doc('society_p'+i),{i:i,part:s.substr(i*VP_CHUNK,VP_CHUNK),updatedAt:meta.updatedAt});
+  }
+  batch.set(col.doc('society'),{data:'',chunks:n,updatedAt:meta.updatedAt,updatedBy:meta.updatedBy,device:meta.device});
+  return batch.commit();
+}
+function vpCloudReadData(d){
+  // d = society doc data; returns a Promise resolving to the full JSON string
+  if(!d||!(d.chunks>0))return Promise.resolve((d&&d.data)||'');
+  var col=vpDB.collection('vaishnopearl'),gets=[];
+  for(var i=0;i<d.chunks;i++)gets.push(col.doc('society_p'+i).get());
+  return Promise.all(gets).then(function(docs){
+    var out='';
+    for(var j=0;j<docs.length;j++){
+      if(!docs[j].exists)throw new Error('cloud part '+j+' missing');
+      out+=docs[j].data().part||'';
+    }
+    return out;
+  });
+}
 function cloudPush(){
   if(!vpDB){cloudStatus('❌ Cloud not connected (need internet). Try again online.',false);showToast('Cloud not available');return;}
   if(!confirm('Upload ALL your current data to the cloud?\n\nThis becomes the shared copy everyone else will pull. Continue?'))return;
   cloudStatus('⏳ Uploading to cloud…');
   var stamp=Date.now();
   var payload={data:JSON.stringify(st),updatedAt:stamp,updatedBy:(ownerFlat?('Flat '+ownerFlat):((ROLES[currentRole]||{}).label||'Admin')),device:vpDeviceId()};
-  vpDB.collection('vaishnopearl').doc('society').set(payload)
+  vpCloudWrite(payload)
     .then(function(){vpSetLastStamp(stamp);cloudStatus('✅ Uploaded on '+ddmmyy_time()+'. Others can now "Get latest".',true);showToast('☁️ Uploaded to cloud');try{logAudit('backup',payload.updatedBy,'Uploaded data to cloud');}catch(e){}})
     .catch(function(e){cloudStatus('❌ Upload failed: '+(e&&e.message?e.message:e),false);showToast('Upload failed');});
 }
@@ -4305,15 +4336,18 @@ function cloudPull(){
   vpDB.collection('vaishnopearl').doc('society').get()
     .then(function(doc){
       if(!doc.exists){cloudStatus('❌ No data in cloud yet. Ask the admin to upload first.',false);showToast('Nothing in cloud yet');return;}
-      var d=doc.data();var parsed;
-      try{parsed=JSON.parse(d.data);}catch(e){cloudStatus('❌ Cloud data unreadable.',false);return;}
-      if(!parsed||!parsed.months){cloudStatus('❌ Cloud data invalid.',false);return;}
-      var when=d.updatedAt?ddmmyy_time(d.updatedAt):'';
-      if(!confirm('Replace this phone\'s data with the cloud copy?\n\nLast uploaded: '+when+' by '+(d.updatedBy||'Admin')+'\n\nYour current data on this phone will be replaced. Continue?'))return;
-      localStorage.setItem('vp5',JSON.stringify(parsed));
-      vpSetLastStamp(d.updatedAt);
-      cloudStatus('✅ Updated from cloud — reloading…',true);showToast('☁️ Got latest data');
-      setTimeout(function(){location.reload();},900);
+      var d=doc.data();
+      return vpCloudReadData(d).then(function(txt){
+        var parsed;
+        try{parsed=JSON.parse(txt);}catch(e){cloudStatus('❌ Cloud data unreadable.',false);return;}
+        if(!parsed||!parsed.months){cloudStatus('❌ Cloud data invalid.',false);return;}
+        var when=d.updatedAt?ddmmyy_time(d.updatedAt):'';
+        if(!confirm('Replace this phone\'s data with the cloud copy?\n\nLast uploaded: '+when+' by '+(d.updatedBy||'Admin')+'\n\nYour current data on this phone will be replaced. Continue?'))return;
+        localStorage.setItem('vp5',JSON.stringify(parsed));
+        vpSetLastStamp(d.updatedAt);
+        cloudStatus('✅ Updated from cloud — reloading…',true);showToast('☁️ Got latest data');
+        setTimeout(function(){location.reload();},900);
+      });
     })
     .catch(function(e){cloudStatus('❌ Download failed: '+(e&&e.message?e.message:e),false);showToast('Download failed');});
 }
@@ -4602,7 +4636,7 @@ function vpMergeFlats(localFlats,remoteFlats){
 }
 function vpMergeState(localSt,remoteSt){
   var merged=JSON.parse(JSON.stringify(remoteSt||{}));
-  ['notices','queries','meetings','payments','documents','accessRequests','works','vehicles'].forEach(function(key){
+  ['notices','queries','meetings','payments','documents','accessRequests','works','vehicles','festivals','festivalContributions'].forEach(function(key){
     merged[key]=vpMergeArraysById((localSt||{})[key],(remoteSt||{})[key],'id');
   });
   merged.months=merged.months||{};
@@ -4634,7 +4668,7 @@ function autoPush(){
     var payload={data:JSON.stringify(st),updatedAt:stamp,updatedBy:(ownerFlat?('Flat '+ownerFlat):((ROLES[currentRole]||{}).label||'User')),device:vpDeviceId()};
     vpLastCloudStamp=stamp;
     vpSetCloudBadge('☁️ saving…','var(--muted)');
-    vpDB.collection('vaishnopearl').doc('society').set(payload)
+    vpCloudWrite(payload)
       .then(function(){
         vpSetLastStamp(stamp);vpSetCloudBadge('☁️ synced ✓','var(--ok)');
         vpSyncFailCount=0;
@@ -4679,7 +4713,7 @@ function startCloudLive(){
     if(!doc.exists){vpFirstSnap=false;return;}
     // skip snapshots that come from our own local write, or from cache
     if(doc.metadata&&(doc.metadata.hasPendingWrites||doc.metadata.fromCache)){return;}
-    var d=doc.data();if(!d||!d.data){vpFirstSnap=false;return;}
+    var d=doc.data();if(!d||!(d.data||d.chunks>0)){vpFirstSnap=false;return;}
     // remember the newest stamp we've seen
     if(d.updatedAt&&d.updatedAt>vpLastCloudStamp)vpLastCloudStamp=d.updatedAt;
     var wasFirst=vpFirstSnap;vpFirstSnap=false;
@@ -4689,7 +4723,11 @@ function startCloudLive(){
     // what this device already has — otherwise this device would never catch up
     // on changes made by others while it was closed (this was the sync bug).
     if(wasFirst&&(d.updatedAt||0)<=vpGetLastStamp())return;
-    var parsed;try{parsed=JSON.parse(d.data);}catch(e){return;}
+    vpCloudReadData(d).then(function(txt){vpApplyRemoteText(d,txt);}).catch(function(){vpSetCloudBadge('☁️ sync error','var(--err)');});
+  },function(err){vpSetCloudBadge('☁️ sync error','var(--err)');vpFirstSnap=false;});
+}
+function vpApplyRemoteText(d,txt){
+    var parsed;try{parsed=JSON.parse(txt);}catch(e){return;}
     if(!parsed||!parsed.months)return;
     vpApplyingRemote=true;
     try{
@@ -4714,7 +4752,6 @@ function startCloudLive(){
       }catch(e2){}
       vpApplyingRemote=false;
     },300);
-  },function(err){vpSetCloudBadge('☁️ sync error','var(--err)');vpFirstSnap=false;});
 }
 
 /* v60.3: re-render the current page after a cloud update, keeping the user where they are */
