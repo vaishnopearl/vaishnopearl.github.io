@@ -10458,36 +10458,28 @@ function printFestivalContrib(){
   var festSel = document.getElementById('fc-fest-select');
   if(!festSel||!festSel.value){alert('Please select a festival');return;}
   var fest=festSel.value, d=vpFestReportData(fest);
-  var w=window.open('','_blank');
-  if(!w){showToast('Allow pop-ups to print the report');return;}
   var fdate=function(ts){try{return new Date(ts||Date.now()).toLocaleDateString('en-IN');}catch(e){return '';}};
   var cRows=d.contribs.map(function(c,i){
-    return '<tr><td>'+(i+1)+'</td><td>Flat '+esc(String(c.flat))+'</td><td>'+esc(c.name||'')+'</td><td>'+esc(c.mode||'')+'</td><td>'+fdate(c.ts)+'</td><td class="r">'+vpInr(parseFloat(c.amount||0))+'</td></tr>';
-  }).join('')||'<tr><td colspan="6" class="c">No contributions recorded</td></tr>';
+    return '<tr><td>'+(i+1)+'</td><td>Flat '+esc(String(c.flat))+'</td><td>'+esc(c.name||'')+'</td><td>'+esc(c.mode||'')+'</td><td>'+fdate(c.ts)+'</td><td class="g">'+vpInr(parseFloat(c.amount||0))+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;color:#6b7280">No contributions recorded</td></tr>';
   var eRows=d.exps.map(function(e,i){
     return '<tr><td>'+(i+1)+'</td><td>'+esc(e.item||'Expense')+'</td><td>'+fdate(e.ts)+'</td><td class="r">'+vpInr(parseFloat(e.amount||0))+'</td></tr>';
-  }).join('')||'<tr><td colspan="4" class="c">No expenses recorded</td></tr>';
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(fest)+' - Festival Report</title><style>'+
-    '*{box-sizing:border-box;font-family:Arial,sans-serif}'+
-    'body{padding:24px;color:#0f1e36;font-size:12px}'+
-    'h1{font-size:18px;margin:0}h2{font-size:14px;margin:18px 0 6px;color:#1b3a66}'+
-    '.sub{color:#5b6b82;font-size:11px;margin-top:2px}'+
-    '.sum{display:flex;gap:10px;margin:14px 0}.sum div{flex:1;border:1px solid #cfd8e6;border-radius:8px;padding:8px 10px}'+
-    '.sum b{display:block;font-size:16px;margin-top:2px}'+
-    'table{width:100%;border-collapse:collapse}th,td{border:1px solid #cfd8e6;padding:5px 7px;text-align:left}'+
-    'th{background:#ecf2fb}.r{text-align:right}.c{text-align:center;color:#5b6b82}'+
-    'tr{page-break-inside:avoid}'+
-    '</style></head><body>'+
-    '<h1>Vaishno Pearl FOMACS — '+esc(fest)+'</h1>'+
-    '<div class="sub">Festival contributions &amp; expenses report · Generated '+fdate(Date.now())+'</div>'+
-    '<div class="sum"><div>Collected<b>'+vpInr(d.collected)+'</b></div><div>Expenses<b>'+vpInr(d.spent)+'</b></div><div>Balance<b>'+vpInr(d.balance)+'</b></div></div>'+
+  }).join('')||'<tr><td colspan="4" style="text-align:center;color:#6b7280">No expenses recorded</td></tr>';
+  var flats=(FD||[]).length, paidFlats={};
+  d.contribs.forEach(function(c){paidFlats[c.flat]=true;});
+  var body='<h2 style="margin-top:0">Festival Report – '+esc(fest)+'</h2>'+
+    '<table><tr><th>Description</th><th>Details</th></tr>'+
+    '<tr><td>Flats contributed</td><td>'+Object.keys(paidFlats).length+' of '+flats+'</td></tr>'+
+    '<tr><td>Total collected</td><td class="g">'+vpInr(d.collected)+'</td></tr>'+
+    '<tr><td>Total expenses</td><td class="r">'+vpInr(d.spent)+'</td></tr>'+
+    '<tr class="tot"><td>Balance</td><td class="'+(d.balance<0?'r':'g')+'">'+vpInr(d.balance)+'</td></tr></table>'+
     '<h2>Contributions ('+d.contribs.length+')</h2>'+
-    '<table><tr><th>#</th><th>Flat</th><th>Owner</th><th>Mode</th><th>Date</th><th class="r">Amount</th></tr>'+cRows+'</table>'+
+    '<table><tr><th>#</th><th>Flat</th><th>Owner</th><th>Mode</th><th>Date</th><th>Amount</th></tr>'+cRows+'</table>'+
     '<h2>Expenses ('+d.exps.length+')</h2>'+
-    '<table><tr><th>#</th><th>Item</th><th>Date</th><th class="r">Amount</th></tr>'+eRows+'</table>'+
-    '<script>window.onload=function(){window.print();}<\/script>'+
-    '</body></html>');
-  w.document.close();
+    '<table><tr><th>#</th><th>Item</th><th>Date</th><th>Amount</th></tr>'+eRows+
+    '<tr class="tot"><td colspan="3">Total Expenses</td><td class="r">'+vpInr(d.spent)+'</td></tr></table>';
+  // Same document builder as receipts: logo header, QR code + unique Validation ID, validated stamp
+  openPdfWindow('Festival Report - '+fest, body+docSigs(), true);
 }
 
 function addFestivalContribution(){
