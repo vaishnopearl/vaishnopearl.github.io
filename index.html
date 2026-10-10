@@ -1806,6 +1806,8 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
           <option value="Electrical Works">⚡ Electrical Works</option>
           <option value="CCTV Cameras">📹 CCTV Cameras</option>
           <option value="Civil Works">🧱 Civil Works</option>
+          <option value="Lift Maintenance">🛗 Lift Maintenance</option>
+          <option value="Water Tank Cleaning & Maintenance">💧 Water Tank Cleaning &amp; Maintenance</option>
           <option value="Plumbing Works">🔧 Plumbing Works</option>
           <option value="Other Works">➕ Other Works</option>
         </select>
@@ -10760,13 +10762,15 @@ function prtCompare(){
 
 // ═══════════ WORK ORDERS: estimate + dual approval (General Secretary + Secretary) ═══════════
 var WO_APPR_ROLES=[{k:'gensec',label:'General Secretary'},{k:'secretary',label:'Secretary'}];
-var WO_ICON={'Painting Works':'🎨','Electrical Works':'⚡','CCTV Cameras':'📹','Civil Works':'🧱','Plumbing Works':'🔧'};
+var WO_ICON={'Painting Works':'🎨','Electrical Works':'⚡','CCTV Cameras':'📹','Civil Works':'🧱','Plumbing Works':'🔧','Lift Maintenance':'🛗','Water Tank Cleaning & Maintenance':'💧'};
 var WO_SUGGEST={
   'Painting Works':['Interior emulsion painting (sq ft)','Exterior weatherproof painting (sq ft)','Primer coat (sq ft)','Wall putty (sq ft)','Enamel on grills / railings','Terrace / parapet painting'],
   'Electrical Works':['Wiring & conduit (point)','LED light fitting (nos)','MCB / DB replacement','Motor / pump panel repair','Earthing work','Street / common-area light'],
   'CCTV Cameras':['IP camera 4MP (nos)','NVR 16-channel','Hard disk 4TB','Cabling & installation (per camera)','PoE switch','Monitor / display'],
   'Civil Works':['Plastering (sq ft)','Terrace waterproofing (sq ft)','Tiling (sq ft)','Brick work (cu m)','Concrete / crack repair','Labour charges'],
-  'Plumbing Works':['Pipe replacement (m)','Tap / valve replacement','Overhead tank cleaning','Leak repair','Motor / pump service'],
+  'Plumbing Works':['Pipe replacement (m)','Tap / valve replacement','Leak repair','Motor / pump service'],
+  'Lift Maintenance':['Lift routine service (per visit)','Lift breakdown repair (per call)','Door operator / sensor repair','Car or landing door repair','Wire rope / belt replacement','Controller / PCB repair','Battery / ARD replacement','Annual safety inspection & certificate','Emergency alarm / intercom repair','Labour & spares'],
+  'Water Tank Cleaning & Maintenance':['Overhead tank cleaning (per tank)','Sump / underground tank cleaning','Anti-bacterial / chlorine disinfection','Tank leak repair & waterproofing','Float valve / ball cock replacement','Level controller / sensor','Pump motor service or repair','Inlet / outlet pipe & valve replacement','Tank lid / manhole cover','Water quality test (lab report)','Labour & materials'],
   'Other Works':[]
 };
 var woItems=[], woEditId=null;
@@ -10855,7 +10859,7 @@ function woEdit(id){
   if(!canEdit()){showToast('Board access only for your role');return;}
   if(vpWoApprState(w).count>0){showToast('Withdraw the signatures before editing');return;}
   woEditId=id;woItems=(w.items||[]).map(function(i){return {d:i.d,q:i.q,r:i.r};});
-  var std=['Painting Works','Electrical Works','CCTV Cameras','Civil Works','Plumbing Works'];
+  var std=['Painting Works','Electrical Works','CCTV Cameras','Civil Works','Lift Maintenance','Water Tank Cleaning & Maintenance','Plumbing Works'];
   var isStd=std.indexOf(w.cat)>=0;
   document.getElementById('wo-cat').value=isStd?w.cat:'Other Works';
   document.getElementById('wo-cat-other').value=isStd?'':(w.cat==='Other Works'?'':w.cat);
