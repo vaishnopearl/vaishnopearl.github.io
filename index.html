@@ -2483,7 +2483,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
 </div>
 <div class="vmodal hidden" id="payment-mode-modal" onclick="if(event.target===this)closePaymentModal()">
   <div class="vcard">
-    <div class="ctitle">💳 Confirm Payment \u2014 Flat <span id="pm-flat-no"></span></div>
+    <div class="ctitle"><span id="pm-title">💳 Confirm Payment</span> \u2014 Flat <span id="pm-flat-no"></span></div>
     <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Pick how the resident paid. Card/wallet payments include the real processing fee, shown here before confirming \u2014 same as any payment gateway.</p>
     <div class="fg">
       <label class="fl">Payment Mode</label>
@@ -2495,11 +2495,15 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
         <option value="netbanking">🏦 Net Banking \u2014 1.5% + GST</option>
         <option value="wallet">👛 Wallet \u2014 2.25% + GST</option>
         <option value="cash">💵 Cash \u2014 0% fee</option>
+        <option value="bank">🏛️ Bank Transfer (NEFT/IMPS) \u2014 0% fee</option>
+        <option value="cheque">📝 Cheque \u2014 0% fee</option>
       </select>
     </div>
+    <div class="fg"><label class="fl">Payment Date</label><input type="date" id="pm-date"/></div>
+    <div class="fg"><label class="fl">Txn / UTR / Cheque Ref. (optional)</label><input type="text" id="pm-ref" placeholder="e.g. UPI ref or cheque no."/></div>
     <div id="pm-breakdown" style="background:var(--surf);border-radius:10px;padding:12px;margin:8px 0"></div>
     <div class="row2">
-      <button class="btn btn-p btn-s" onclick="confirmPaymentWithMode()">✅ Confirm Payment</button>
+      <button class="btn btn-p btn-s" id="pm-confirm-btn" onclick="confirmPaymentWithMode()">✅ Confirm Payment</button>
       <button class="btn btn-o btn-s" style="color:var(--P)" onclick="closePaymentModal()">Cancel</button>
     </div>
   </div>
@@ -4715,7 +4719,7 @@ function vpMergeFlats(localFlats,remoteFlats){
     if(!lf||lf.no==null)return;
     var rf=byNo[lf.no];
     if(!rf){byNo[lf.no]=lf;return;}
-    var lt=lf.verifiedAt||lf.inProgressAt||lf.doneAt||0, rt=rf.verifiedAt||rf.inProgressAt||rf.doneAt||0;
+    var lt=Math.max(lf.payEditedAt||0,lf.verifiedAt||lf.inProgressAt||lf.doneAt||0), rt=Math.max(rf.payEditedAt||0,rf.verifiedAt||rf.inProgressAt||rf.doneAt||0);
     byNo[lf.no]=(lt>=rt)?lf:rf;
   });
   return Object.keys(byNo).map(function(k){return byNo[k];});
@@ -5383,13 +5387,13 @@ function expenseNotifyMsg(e,k){
 function expenseNotifyMsgWa(e,k){
   return `*Vaishno Pearl FOMACS*\n*Expense Paid*\n\n${e.label} — *${fmt(e.amount)}*\nMonth: ${lbl(k)}${e.note?('\nNote: '+e.note):''}\nRecorded by: ${e.addedBy}\n\nThis has been logged in the maintenance app for everyone's visibility.`;
 }
-function paymentReceivedMsg(flatNo,amount,k,method){
+function paymentReceivedMsg(flatNo,amount,k,method,pdate){
   const f=FD.find(x=>x.no===flatNo);
-  return `Vaishno Pearl FOMACS — Payment Received: Flat ${flatNo}${f?(' ('+f.name+')'):''} paid ${fmt(amount)} for ${lbl(k)}${method?(' via '+method):''}. Thank you!`;
+  return `Vaishno Pearl FOMACS — Payment Received: Flat ${flatNo}${f?(' ('+f.name+')'):''} paid ${fmt(amount)} for ${lbl(k)}${pdate?(' on '+pdate):''}${method?(' via '+method):''}. Thank you!`;
 }
-function paymentReceivedMsgWa(flatNo,amount,k,method){
+function paymentReceivedMsgWa(flatNo,amount,k,method,pdate){
   const f=FD.find(x=>x.no===flatNo);
-  return `*Vaishno Pearl FOMACS*\n*Payment Received* ✅\n\nFlat ${flatNo}${f?(' — '+f.name):''}\nAmount: *${fmt(amount)}*\nMonth: ${lbl(k)}${method?('\nVia: '+method):''}\n\nThank you for paying on time!`;
+  return `*Vaishno Pearl FOMACS*\n*Payment Received* ✅\n\nFlat ${flatNo}${f?(' — '+f.name):''}\nAmount: *${fmt(amount)}*\nMonth: ${lbl(k)}${pdate?('\nPaid on: '+pdate):''}${method?('\nVia: '+method):''}\n\nThank you for paying on time!`;
 }
 function broadcastPush(title,body){
   if(!vpDB)return;
@@ -5416,13 +5420,13 @@ function notifyPaymentSms(flatNo,k){
   const fl=gmd(k).flats.find(x=>x.no===flatNo);if(!fl||!fl.paid)return;
   const nums=allNotifyRecipients();
   if(!nums.length){showToast('No phone numbers on file');return;}
-  openSms(nums,paymentReceivedMsg(flatNo,fl.amountReceived||st.mf,k,fl.paidMethod));
+  openSms(nums,paymentReceivedMsg(flatNo,fl.amountReceived||st.mf,k,vpPayMode(fl),vpPayDate(fl)));
 }
 function notifyPaymentWa(flatNo,k){
   if(!canEdit())return;
   const fl=gmd(k).flats.find(x=>x.no===flatNo);if(!fl||!fl.paid)return;
   const a=document.createElement('a');
-  a.href='https://wa.me/?text='+encodeURIComponent(paymentReceivedMsgWa(flatNo,fl.amountReceived||st.mf,k,fl.paidMethod));
+  a.href='https://wa.me/?text='+encodeURIComponent(paymentReceivedMsgWa(flatNo,fl.amountReceived||st.mf,k,vpPayMode(fl),vpPayDate(fl)));
   a.target='_blank';a.rel='noopener';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   showToast('Opening WhatsApp — pick your society group to send');
@@ -6724,16 +6728,33 @@ const PAYMENT_MODE_FEES={
   credit:{label:'Credit Card',pct:2},
   netbanking:{label:'Net Banking',pct:1.5},
   wallet:{label:'Wallet',pct:2.25},
-  cash:{label:'Cash',pct:0}
+  cash:{label:'Cash',pct:0},
+  bank:{label:'Bank Transfer',pct:0},
+  cheque:{label:'Cheque',pct:0}
 };
 const PM_GST_PCT=18;
-var vpPendingPayment=null; // {k,i}
-function openPaymentModal(k,i){
+var vpPendingPayment=null; // {k,i,edit}
+// ── payment details helpers (work for board "Mark Paid" and owner-proof payments) ──
+function vpPayMode(f){return (f&&(f.paymentModeLabel||f.paidMethod||f.paidMode))||'';}
+function vpPayTs(f){return (f&&(f.paidOn||f.verifiedAt))||0;}
+function vpPayDate(f){var t=vpPayTs(f);return t?ddmmyy(t):'';}
+function vpPayRef(f){return (f&&f.paidRef)||'';}
+function vpPayLine(f){var d=vpPayDate(f),m=vpPayMode(f);return [d,m].filter(Boolean).join(' · ');}
+function vpTodayIso(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function vpIsoToTs(iso){var p=String(iso||'').split('-');if(p.length!==3)return Date.now();var d=new Date(+p[0],+p[1]-1,+p[2],12,0,0);return d.getTime();}
+function vpTsToIso(t){var d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function vpModeKey(f){var l=vpPayMode(f).toLowerCase();var keys=Object.keys(PAYMENT_MODE_FEES);for(var i=0;i<keys.length;i++){if(PAYMENT_MODE_FEES[keys[i]].label.toLowerCase()===l||keys[i]===l)return keys[i];}if(l.indexOf('upi')>=0)return 'upi';if(l.indexOf('cash')>=0)return 'cash';if(l.indexOf('cheque')>=0)return 'cheque';if(l.indexOf('bank')>=0||l.indexOf('neft')>=0||l.indexOf('imps')>=0)return 'bank';return 'upi';}
+function openPaymentModal(k,i,edit){
   if(!canEdit()){showToast('Board access only for your role');return;}
   const md=gmd(k);const f=md.flats[i];if(!f)return;
-  vpPendingPayment={k:k,i:i};
+  vpPendingPayment={k:k,i:i,edit:!!edit};
   document.getElementById('pm-flat-no').textContent=f.no;
-  document.getElementById('pm-mode').value='upi';
+  document.getElementById('pm-title').textContent=edit?'✏️ Payment Details':'💳 Confirm Payment';
+  document.getElementById('pm-confirm-btn').textContent=edit?'💾 Save Details':'✅ Confirm Payment';
+  document.getElementById('pm-mode').value=edit?vpModeKey(f):'upi';
+  document.getElementById('pm-date').value=edit&&vpPayTs(f)?vpTsToIso(vpPayTs(f)):vpTodayIso();
+  document.getElementById('pm-date').max=vpTodayIso();
+  document.getElementById('pm-ref').value=edit?vpPayRef(f):'';
   document.getElementById('payment-mode-modal').classList.remove('hidden');
   renderPaymentBreakdown();
 }
@@ -6755,6 +6776,7 @@ function pmCalc(){
 }
 function renderPaymentBreakdown(){
   const box=document.getElementById('pm-breakdown');if(!box)return;
+  if(vpPendingPayment&&vpPendingPayment.edit){box.innerHTML='<div style="font-size:11px;color:var(--muted)">Only the payment mode, date and reference are changed. The amount received stays as recorded.</div>';return;}
   const c=pmCalc();
   let rows='<div class="sr"><span class="slb">Base Maintenance</span><span>'+fmt(c.base)+'</span></div>';
   if(c.penaltyAmt>0)rows+='<div class="sr"><span class="slb" style="color:#a11">Late Penalty ('+c.penaltyPct+'%)</span><span style="color:#a11">'+fmt(c.penaltyAmt)+'</span></div>';
@@ -6772,9 +6794,23 @@ function confirmPaymentWithMode(){
   const {k,i}=vpPendingPayment;
   const md=gmd(k);const f=md.flats[i];if(!f)return;
   const c=pmCalc();
+  const _iso=document.getElementById('pm-date').value||vpTodayIso();
+  if(_iso>vpTodayIso()){showToast('Payment date cannot be in the future');return;}
+  const _ref=document.getElementById('pm-ref').value.trim();
+  if(vpPendingPayment.edit){
+    // edit only the payment details of an already-paid flat; amounts stay as recorded
+    f.paymentMode=c.mode;f.paymentModeLabel=c.label;
+    f.paidMethod=c.label;
+    f.paidOn=vpIsoToTs(_iso);f.paidRef=_ref;f.payEditedAt=Date.now();
+    sv();closePaymentModal();rFlats();rDash();
+    showToast('✅ Payment details saved');
+    return;
+  }
   f.paid=true;
   f.verifiedBy=(ROLES[currentRole]||{}).label||'Managing Committee';
   f.verifiedAt=Date.now();
+  f.paidOn=vpIsoToTs(_iso);f.paidRef=_ref;f.payEditedAt=Date.now();
+  f.paidMethod=c.label;
   applyPenaltyOnPay(f,k); // unchanged existing penalty logic — records penaltyApplied/penaltyPct/serviceStopped
   f.paymentMode=c.mode;
   f.paymentModeLabel=c.label;
@@ -7389,11 +7425,13 @@ function rFlats(){
         <div class="fno">Flat ${f.no}</div>
         <div class="fnm">${esc(f.name)}${tenantTag(f.no)}</div>
         <div class="fam">${f.paid?'Paid '+fmt(st.mf):'Due '+fmt(st.mf)}</div>
+        ${f.paid?`<div style="font-size:10.5px;color:var(--muted);margin-top:2px">📅 ${esc(vpPayDate(f)||'—')} · 💳 ${esc(vpPayMode(f)||'Mode not recorded')}${vpPayRef(f)?' · Ref '+esc(vpPayRef(f)):''}</div>`:''}
         ${penTag}
       </div>
       <div class="fc">
         <span class="bdg ${f.paid?'bp':'bn'}">${f.paid?'✓ Paid':'✗ Pending'}</span>
         ${isAdmin?`<button class="tbtn" onclick="${f.paid?`togF('${k}',${i})`:`openPaymentModal('${k}',${i})`}">${f.paid?'Mark Pending':'Mark Paid'}</button>`:''}
+        ${(isAdmin&&f.paid)?`<button class="tbtn" onclick="openPaymentModal('${k}',${i},true)">💳 Payment Details</button>`:''}
         ${isAdmin?`<button class="tbtn" onclick="openFlatEdit('${f.no}')">✏️ Edit</button>`:''}
         <button class="tbtn" onclick="prtFlat('${f.no}')">🖨️ History</button>
         <button class="tbtn" style="background:#0369a1;color:#fff;border-color:#0369a1" onclick="prtIdCard('flat','${esc(f.name).replace(/'/g,"\\'")}','Flat ${f.no} · Owner','VP-FLAT-${f.no}')">🪪 ID Card</button>
@@ -7432,13 +7470,15 @@ function togF(k,i){
     md.flats[i].verifiedBy=(ROLES[currentRole]||{}).label||'Managing Committee';
     md.flats[i].verifiedAt=Date.now();
   }else{
-    delete md.flats[i].verifiedBy; delete md.flats[i].verifiedAt;
+    delete md.flats[i].verifiedBy; delete md.flats[i].verifiedAt;delete md.flats[i].paymentMode;delete md.flats[i].paymentModeLabel;delete md.flats[i].paidMethod;delete md.flats[i].paidOn;delete md.flats[i].paidRef;delete md.flats[i].payEditedAt;delete md.flats[i].convenienceFee;delete md.flats[i].convenienceFeeGST;delete md.flats[i].amountReceived;
+  }
+  if(md.flats[i].paid&&!md.flats[i].paidOn){md.flats[i].paidOn=vpIsoToTs(vpTodayIso());md.flats[i].payEditedAt=Date.now();
   }
   applyPenaltyOnPay(md.flats[i],k);
   sv();rFlats();rDash();showToast(md.flats[i].paid?'✅ Marked Paid':'⚠️ Marked Pending');
 }
-function allPaid(){if(!canEdit())return;const k=document.getElementById('fm').value;const _who=(ROLES[currentRole]||{}).label||'Managing Committee';const _now=Date.now();gmd(k).flats.forEach(f=>{f.paid=true;f.verifiedBy=_who;f.verifiedAt=_now;applyPenaltyOnPay(f,k);});sv();rFlats();rDash();showToast('✅ All Marked Paid');}
-function allPend(){if(!canEdit())return;const k=document.getElementById('fm').value;gmd(k).flats.forEach(f=>{f.paid=false;applyPenaltyOnPay(f,k);});sv();rFlats();rDash();showToast('All Marked Pending');}
+function allPaid(){if(!canEdit())return;const k=document.getElementById('fm').value;const _who=(ROLES[currentRole]||{}).label||'Managing Committee';const _now=Date.now();gmd(k).flats.forEach(f=>{f.paid=true;f.verifiedBy=_who;f.verifiedAt=_now;if(!f.paidOn){f.paidOn=_now;f.payEditedAt=_now;}applyPenaltyOnPay(f,k);});sv();rFlats();rDash();showToast('✅ All Marked Paid');}
+function allPend(){if(!canEdit())return;const k=document.getElementById('fm').value;gmd(k).flats.forEach(f=>{f.paid=false;delete f.paymentMode;delete f.paymentModeLabel;delete f.paidMethod;delete f.paidOn;delete f.paidRef;delete f.payEditedAt;delete f.convenienceFee;delete f.convenienceFeeGST;delete f.amountReceived;applyPenaltyOnPay(f,k);});sv();rFlats();rDash();showToast('All Marked Pending');}
 
 function openFlatEdit(no){
   if(!canEdit()){showToast('Board access only for your role');return;}
@@ -8567,7 +8607,8 @@ function vpReceiptImage(flatNo,k){
         ['Owner Name', flat.name||''],
         ['Month', lbl(k)],
         ['Amount Received', fmt(fi.amountReceived||st.mf||0)],
-        ['Payment Mode', fi.paidMethod||fi.paidMode||'-'],
+        ['Payment Date', vpPayDate(fi)||'-'],
+        ['Payment Mode', vpPayMode(fi)||'-'],
         ['Txn / UTR Ref.', fi.paidRef||'-'],
         ['Receipt Date', ddmmyy()]
       ];
@@ -8690,7 +8731,7 @@ function sendReceiptToOwner(flatNo, k, channel){
     'Name: '+(flat.name||'')+'\n'+
     'Month: '+lbl(k)+'\n'+
     'Amount: '+fmt(fi.amountReceived||st.mf||0)+'\n'+
-    (fi.paidMode?('Mode: '+fi.paidMode+'\n'):'')+
+    (vpPayDate(fi)?('Paid on: '+vpPayDate(fi)+'\n'):'')+(vpPayMode(fi)?('Mode: '+vpPayMode(fi)+'\n'):'')+
     (fi.paidRef?('Txn Ref: '+fi.paidRef+'\n'):'')+
     (fi.verifiedBy?('Verified by: '+fi.verifiedBy+'\n'):'')+
     (fi.verifiedAt?('Verified on: '+ddmmyy_time(fi.verifiedAt)+'\n'):'')+
@@ -8737,6 +8778,7 @@ function confirmPaymentAndReceipt(id){
     _fl.amountReceived=d.amount||st.mf;
     _fl.paidMethod=d.method||'';
     _fl.paidRef=d.ref||'';
+    if(!_fl.paidOn){_fl.paidOn=Date.now();_fl.payEditedAt=Date.now();}
     _fl.verifiedBy=(ROLES[currentRole]||{}).label||'Board';
     _fl.verifiedAt=Date.now();
     _fl.proofValId=(typeof valId==='function'?valId(d):'');
@@ -9307,6 +9349,9 @@ function rMyFlat(){
       ${pen.tier>0?`<div class="sr"><span class="slb" style="color:#a11">Penalty (${pen.penaltyPct}%)</span><span style="font-weight:700;color:#a11">${fmt(pen.penaltyAmt)}</span></div>
       <div class="sr"><span class="slb" style="color:#a11">Total Payable</span><span style="font-weight:800;color:#a11">${fmt(pen.total)}</span></div>${pen.serviceStopped?`<div style="font-size:11px;font-weight:700;color:#a11;margin-top:4px">🚫 Services to your flat are stopped until payment is cleared.</div>`:''}`:''}
       <div class="sr tot"><span class="slb">Status</span><span class="${paid?'lpaid':'lpend'}" style="font-size:16px">${statusLabel}</span></div>
+      ${paid?`<div class="sr"><span class="slb">Paid On</span><span style="font-weight:600">${esc(vpPayDate(fi)||'—')}</span></div>
+      <div class="sr"><span class="slb">Payment Mode</span><span style="font-weight:600">${esc(vpPayMode(fi)||'—')}</span></div>
+      ${vpPayRef(fi)?`<div class="sr"><span class="slb">Txn / UTR Ref.</span><span style="font-weight:600">${esc(vpPayRef(fi))}</span></div>`:''}`:''}
     </div>
     ${!paid?`<div class="card" style="border-color:var(--err);background:var(--errB)">
       <div style="font-size:12px;color:var(--err);font-weight:600">⚠️ Your maintenance for ${lbl(k)} is pending. Please pay and inform the Treasurer to update your status.</div>
@@ -9339,7 +9384,7 @@ function rMyFlat(){
     const f=m.flats.find(x=>x.no===ownerFlat);
     const p=f&&f.paid;
     if(p)tp+=st.mf;else td+=st.mf;
-    return`<div class="litem"><div style="font-size:12px;color:var(--muted)">${lbl(kk)}</div><span class="${p?'lpaid':'lpend'}">${p?'✓ '+fmt(st.mf):'✗ Pending'}</span></div>`;
+    return`<div class="litem"><div style="font-size:12px;color:var(--muted)">${lbl(kk)}</div><span class="${p?'lpaid':'lpend'}">${p?'✓ '+fmt(st.mf):'✗ Pending'}</span>${p&&vpPayLine(f)?`<div style="font-size:10.5px;color:var(--muted);flex-basis:100%;text-align:right">${esc(vpPayLine(f))}</div>`:''}</div>`;
   }).join('');
   document.getElementById('myflat-history').innerHTML=
     `<div class="card" style="margin-bottom:10px">
@@ -9362,13 +9407,13 @@ function prtMyLedger(){
     const fi=md.flats.find(f=>f.no===ownerFlat);
     const paid=fi&&fi.paid;
     if(paid)tp+=st.mf;else td+=st.mf;
-    return`<tr><td>${lbl(k)}</td><td class="${paid?'g':'r'}">${paid?'Paid':'Pending'}</td><td>${paid?fmt(st.mf):'-'}</td></tr>`;
+    return`<tr><td>${lbl(k)}</td><td class="${paid?'g':'r'}">${paid?'Paid':'Pending'}</td><td>${paid?esc(vpPayDate(fi)||'-'):'-'}</td><td>${paid?esc(vpPayMode(fi)||'-'):'-'}</td><td>${paid?fmt(st.mf):'-'}</td></tr>`;
   }).join('');
   openPdfWindow('Flat '+ownerFlat+' Ledger',`
     <h1>Flat ${ownerFlat} – ${esc(flat.name)}</h1><h2>Payment Ledger</h2>
-    <table><tr><th>Month</th><th>Status</th><th>Amount</th></tr>${rows}
-    <tr class="tot"><td colspan="2">Total Paid</td><td class="g">${fmt(tp)}</td></tr>
-    <tr class="tot"><td colspan="2">Total Pending</td><td class="r">${fmt(td)}</td></tr></table>
+    <table><tr><th>Month</th><th>Status</th><th>Paid On</th><th>Mode</th><th>Amount</th></tr>${rows}
+    <tr class="tot"><td colspan="4">Total Paid</td><td class="g">${fmt(tp)}</td></tr>
+    <tr class="tot"><td colspan="4">Total Pending</td><td class="r">${fmt(td)}</td></tr></table>
   `+docSigs(),true);
 }
 
@@ -9457,12 +9502,15 @@ function prtMyReceipt(){
         <tr><td style="border:none;border-top:1px solid #ccc;padding-top:8px"><b>Total Paid</b></td><td style="border:none;border-top:1px solid #ccc;padding-top:8px" class="g"><b>${fmt(fi.paidTotal||fi.amountReceived||st.mf)}</b></td></tr>
         <tr><td style="border:none;font-size:10.5px;color:#666" colspan="2"><i>${esc(amountToWords(fi.paidTotal||fi.amountReceived||st.mf))}</i></td></tr>
         <tr><td style="border:none"><b>Status</b></td><td style="border:none" class="g">PAID ✓</td></tr>
-        <tr><td style="border:none"><b>Payment Mode</b></td><td style="border:none">${esc(fi.paymentModeLabel||'—')}</td></tr>
+        <tr><td style="border:none"><b>Payment Date</b></td><td style="border:none">${esc(vpPayDate(fi)||'—')}</td></tr>
+        <tr><td style="border:none"><b>Payment Mode</b></td><td style="border:none">${esc(vpPayMode(fi)||'—')}</td></tr>
+        ${vpPayRef(fi)?`<tr><td style="border:none"><b>Txn / UTR Ref.</b></td><td style="border:none">${esc(vpPayRef(fi))}</td></tr>`:''}
   `:`
         <tr><td style="border:none"><b>Amount Paid</b></td><td style="border:none" class="g">${fmt(fi.amountReceived||st.mf)}</td></tr>
         <tr><td style="border:none;font-size:10.5px;color:#666" colspan="2"><i>${esc(amountToWords(fi.amountReceived||st.mf))}</i></td></tr>
         <tr><td style="border:none"><b>Status</b></td><td style="border:none" class="g">PAID ✓</td></tr>
-        <tr><td style="border:none"><b>Payment Mode</b></td><td style="border:none">${fi.paidMethod||'—'}</td></tr>
+        <tr><td style="border:none"><b>Payment Date</b></td><td style="border:none">${esc(vpPayDate(fi)||'—')}</td></tr>
+        <tr><td style="border:none"><b>Payment Mode</b></td><td style="border:none">${esc(vpPayMode(fi)||'—')}</td></tr>
         <tr><td style="border:none"><b>Txn / UTR Ref.</b></td><td style="border:none">${fi.paidRef||'—'}</td></tr>
   `;
   openPdfWindow('Receipt - Flat '+ownerFlat,`
@@ -9585,7 +9633,8 @@ function prtFlatReceipt(flatNo,k){
         <tr><td style="border:none"><b>Amount Paid</b></td><td style="border:none" class="g">${fmt(fi.amountReceived||st.mf)}</td></tr>
         <tr><td style="border:none;font-size:10.5px;color:#666" colspan="2"><i>${esc(amountToWords(fi.amountReceived||st.mf))}</i></td></tr>
         <tr><td style="border:none"><b>Status</b></td><td style="border:none" class="g">PAID ✓</td></tr>
-        <tr><td style="border:none"><b>Payment Mode</b></td><td style="border:none">${fi.paidMethod||'—'}</td></tr>
+        <tr><td style="border:none"><b>Payment Date</b></td><td style="border:none">${esc(vpPayDate(fi)||'—')}</td></tr>
+        <tr><td style="border:none"><b>Payment Mode</b></td><td style="border:none">${esc(vpPayMode(fi)||'—')}</td></tr>
         <tr><td style="border:none"><b>Txn / UTR Ref.</b></td><td style="border:none">${fi.paidRef||'—'}</td></tr>
         <tr><td style="border:none"><b>Receipt No.</b></td><td style="border:none">${vpReceiptNo(flatNo,k)}</td></tr>
         <tr><td style="border:none"><b>Verification Code</b></td><td style="border:none"><b style="letter-spacing:2px;color:#15803d">${vpReceiptCode(flatNo,k,fi)}</b></td></tr>
@@ -9615,7 +9664,8 @@ function prtMonthlyStatement(k){
     return `<tr><td style="border:none">${f.no}</td><td style="border:none">${esc(f.name||'')}</td>`+
       `<td style="border:none;text-align:center">${f.paid?'<span class="g">PAID</span>':'<span class="r">PENDING</span>'}</td>`+
       `<td style="border:none;text-align:right">${f.paid?fmt(amt):'—'}</td>`+
-      `<td style="border:none">${f.paid?(f.paidMethod||'—'):'—'}</td></tr>`;
+      `<td style="border:none">${f.paid?(vpPayDate(f)||'—'):'—'}</td>`+
+      `<td style="border:none">${f.paid?(vpPayMode(f)||'—'):'—'}</td></tr>`;
   }).join('');
   const expRows=(md.expenses||[]).map(e=>
     `<tr><td style="border:none">${esc(e.cat||e.label||'')}</td><td style="border:none">${esc(e.note||'')}</td><td style="border:none;text-align:right">${fmt(+e.amount||0)}</td></tr>`
@@ -10302,15 +10352,15 @@ function prtFlat(fnoArg){
     const fi=md.flats.find(f=>f.no===fno);
     const paid=fi&&fi.paid;
     if(paid)tp+=st.mf;else td+=st.mf;
-    return`<tr><td>${lbl(k)}</td><td class="${paid?'g':'r'}">${paid?'Paid':'Pending'}</td><td>${paid?fmt(st.mf):'-'}</td></tr>`;
+    return`<tr><td>${lbl(k)}</td><td class="${paid?'g':'r'}">${paid?'Paid':'Pending'}</td><td>${paid?esc(vpPayDate(fi)||'-'):'-'}</td><td>${paid?esc(vpPayMode(fi)||'-'):'-'}</td><td>${paid?fmt(st.mf):'-'}</td></tr>`;
   }).join('');
   const body=`
   <h2 style="margin-top:0">Flat ${fno} – ${esc(flat.name)}</h2>
   <h2>Month-wise Payment History</h2>
-  <table><tr><th>Month</th><th>Status</th><th>Amount Paid</th></tr>
+  <table><tr><th>Month</th><th>Status</th><th>Paid On</th><th>Mode</th><th>Amount Paid</th></tr>
   ${rows}
-  <tr class="tot"><td colspan="2">Total Paid</td><td class="g">${fmt(tp)}</td></tr>
-  <tr class="tot"><td colspan="2">Total Pending</td><td class="r">${fmt(td)}</td></tr></table>
+  <tr class="tot"><td colspan="4">Total Paid</td><td class="g">${fmt(tp)}</td></tr>
+  <tr class="tot"><td colspan="4">Total Pending</td><td class="r">${fmt(td)}</td></tr></table>
   `;
   openPdfWindow('Flat '+fno+' Ledger',body+docSigs(),true);
 }
