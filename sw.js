@@ -3,7 +3,7 @@
 // and only falls back to the cached copy if the device is offline.
 // This avoids "stuck on an old version" problems for a frequently-updated app.
 
-const CACHE_NAME = 'vaishno-pearl-v603';
+const CACHE_NAME = 'vaishno-pearl-v604';
 const PRECACHE_URLS = [
   './index.html',
   './manifest.webmanifest',
@@ -30,8 +30,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  // Same-origin files (index.html etc.): always revalidate with the server so the browser's
+  // HTTP cache (GitHub Pages allows ~10 min) can never serve a stale copy after an update.
+  const sameOrigin = new URL(event.request.url).origin === self.location.origin;
+  const net = sameOrigin ? fetch(event.request.url, { cache: 'no-cache' }) : fetch(event.request);
+
   event.respondWith(
-    fetch(event.request)
+    net
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
