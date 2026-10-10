@@ -1648,6 +1648,9 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div id="fcf-expense-list"></div>
   </div>
 
+  <div class="sec">✍️ Board Approval</div>
+  <div class="card" id="fcf-approval"></div>
+
   <div class="sec">💾 Export & Actions</div>
   <div class="card">
     <button class="btn btn-o" style="color:var(--P);margin-bottom:8px" onclick="exportFestivalContribCSV()">📥 Export to CSV</button>
@@ -2666,6 +2669,7 @@ function load(){
     if(!parsed.diesel)parsed.diesel={price:90,lph:3,hpd:4};
     if(!parsed.festivals)parsed.festivals=[];
     if(!parsed.festivalContributions)parsed.festivalContributions=[];
+    if(!parsed.festApprovals)parsed.festApprovals={};
     if(!parsed.festivalRates)parsed.festivalRates={};
     if(!parsed.authSign)parsed.authSign={name:'',desig:'Secretary',sig:''};
     if(parsed.backupEmail===undefined)parsed.backupEmail='';
@@ -4638,6 +4642,17 @@ function vpMergeState(localSt,remoteSt){
   var merged=JSON.parse(JSON.stringify(remoteSt||{}));
   ['notices','queries','meetings','payments','documents','accessRequests','works','vehicles','festivals','festivalContributions'].forEach(function(key){
     merged[key]=vpMergeArraysById((localSt||{})[key],(remoteSt||{})[key],'id');
+  });
+  // festival approvals: keep every festival/role signature; if both sides have one, keep the newer
+  merged.festApprovals={};
+  [(remoteSt||{}).festApprovals,(localSt||{}).festApprovals].forEach(function(src){
+    Object.keys(src||{}).forEach(function(f){
+      merged.festApprovals[f]=merged.festApprovals[f]||{};
+      Object.keys(src[f]||{}).forEach(function(r){
+        var cur=merged.festApprovals[f][r], nx=src[f][r];
+        if(nx&&(!cur||(nx.at||0)>(cur.at||0)))merged.festApprovals[f][r]=nx;
+      });
+    });
   });
   merged.months=merged.months||{};
   var allMonthKeys={};
@@ -10417,6 +10432,7 @@ function loadFestivalContributions(){
     </div>
   `).join('');
   document.getElementById('fcf-expense-list').innerHTML = expHtml || '<p style="font-size:12px;color:var(--muted)">No expenses recorded</p>';
+  try{vpRenderFestApproval();}catch(e){}
 }
 
 function exportFestivalContribCSV(){
@@ -10443,6 +10459,83 @@ function vpFestReportData(festVal){
 }
 function vpInr(n){return '₹'+Math.round(n).toLocaleString('en-IN');}
 
+// ---- Board approval (General Secretary, Secretary, Treasurer, Vice President) for the festival report ----
+var VP_FEST_APPR_ROLES=[{k:'gensec',label:'General Secretary'},{k:'secretary',label:'Secretary'},{k:'treasurer',label:'Treasurer'},{k:'vp',label:'Vice President'}];
+function vpFestApprN(){return VP_FEST_APPR_ROLES.length;}
+function vpFestSnap(d){return d.contribs.length+'|'+d.exps.length+'|'+Math.round(d.collected)+'|'+Math.round(d.spent);}
+function vpFestApprState(fest){
+  var a=(st.festApprovals||{})[fest]||{}, snap=vpFestSnap(vpFestReportData(fest)), out={snap:snap,count:0,roles:{}};
+  VP_FEST_APPR_ROLES.forEach(function(r){
+    var x=a[r.k]; if(x&&x.void)x=null; // withdrawn signatures are kept as dated 'void' markers so the withdrawal syncs
+    var valid=!!(x&&x.snap===snap);
+    out.roles[r.k]={entry:x||null,valid:valid,stale:!!(x&&!valid)};
+    if(valid)out.count++;
+  });
+  out.full=out.count===VP_FEST_APPR_ROLES.length;
+  return out;
+}
+function vpRenderFestApproval(){
+  var box=document.getElementById('fcf-approval');if(!box)return;
+  var festSel=document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){box.innerHTML='<div style="color:var(--muted);font-size:12px">Select a festival to approve its report</div>';return;}
+  var fest=festSel.value, s=vpFestApprState(fest);
+  var head=s.full?'<div class="bdg bp" style="display:inline-block;margin-bottom:10px">✅ Fully approved</div>'
+    :'<div class="bdg" style="display:inline-block;margin-bottom:10px;background:var(--warnB);color:var(--warn)">⏳ '+s.count+' of '+vpFestApprN()+' approvals</div>';
+  var rows=VP_FEST_APPR_ROLES.map(function(r){
+    var st1=s.roles[r.k], e=st1.entry, canAct=canEdit()&&(currentRole===r.k||isSuper());
+    var status=st1.valid?('<span style="color:var(--ok);font-weight:700">✅ Signed by '+esc(e.by||r.label)+'</span><br><span style="font-size:10px;color:var(--muted)">'+ddmmyy_time(e.at)+'</span>'+(e.sig?'<br><img src="'+e.sig+'" style="height:38px;max-width:140px;object-fit:contain;margin-top:3px;background:#fff;border-radius:4px"/>':''))
+      :(st1.stale?'<span style="color:var(--err);font-weight:700">⚠️ Figures changed after signing</span><br><span style="font-size:10px;color:var(--muted)">Needs fresh approval</span>'
+      :'<span style="color:var(--muted)">⏳ Pending</span>');
+    var btn='';
+    if(canAct&&!st1.valid)btn='<button class="tbtn" style="background:#0369a1;color:#fff;border-color:#0369a1" onclick="approveFestival(\''+r.k+'\')">✍️ Sign</button>';
+    else if(canAct&&e)btn='<button class="tbtn" onclick="withdrawFestApproval(\''+r.k+'\')">↩ Withdraw</button>';
+    return '<div class="frow"><div class="fi"><div class="fno">'+esc(r.label)+'</div><div class="fnm" style="font-size:12px;font-weight:600">'+status+'</div></div><div class="fc">'+btn+'</div></div>';
+  }).join('');
+  box.innerHTML=head+rows+'<div style="font-size:10px;color:var(--muted);margin-top:4px">The General Secretary, Secretary, Treasurer and Vice President must all sign. If a contribution or expense changes afterwards, signatures must be given again.</div>';
+}
+function approveFestival(role){
+  var festSel=document.getElementById('fc-fest-select');
+  if(!festSel||!festSel.value){showToast('Select a festival first');return;}
+  if(!(canEdit()&&(currentRole===role||isSuper()))){showToast('Only the '+((ROLES[role]||{}).label||role)+' can sign this');return;}
+  var fest=festSel.value, d=vpFestReportData(fest);
+  if(!d.contribs.length&&!d.exps.length){showToast('Nothing to approve yet');return;}
+  var rlabel=(ROLES[role]||{}).label||role;
+  openSigPad('Approve as '+rlabel, fest+' · Collected '+vpInr(d.collected)+' · Expenses '+vpInr(d.spent), function(sig){
+    var now=Date.now(), who=(ROLES[currentRole]||{}).label||rlabel;
+    st.festApprovals=st.festApprovals||{};
+    st.festApprovals[fest]=st.festApprovals[fest]||{};
+    st.festApprovals[fest][role]={by:who,at:now,sig:sig,snap:vpFestSnap(d)};
+    try{logAudit('approve',who,'Approved & signed festival report ('+rlabel+') · '+fest+' · Collected '+vpInr(d.collected)+' · Expenses '+vpInr(d.spent));}catch(e){}
+    sv();vpRenderFestApproval();
+    showToast('✅ Signed as '+rlabel+(vpFestApprState(fest).full?' · fully approved':''));
+  });
+}
+function withdrawFestApproval(role){
+  var festSel=document.getElementById('fc-fest-select');if(!festSel||!festSel.value)return;
+  if(!(canEdit()&&(currentRole===role||isSuper()))){showToast('Not allowed');return;}
+  var fest=festSel.value, rlabel=(ROLES[role]||{}).label||role;
+  if(!confirm('Withdraw the '+rlabel+' signature on the '+fest+' report?'))return;
+  st.festApprovals=st.festApprovals||{};st.festApprovals[fest]=st.festApprovals[fest]||{};
+  st.festApprovals[fest][role]={void:true,at:Date.now(),by:(ROLES[currentRole]||{}).label||rlabel};
+  try{logAudit('approve',(ROLES[currentRole]||{}).label||rlabel,'Withdrew festival report approval ('+rlabel+') · '+fest);}catch(e){}
+  sv();vpRenderFestApproval();showToast('Signature withdrawn');
+}
+function vpFestApprovalPrintHtml(fest){
+  var s=vpFestApprState(fest);
+  var slots=VP_FEST_APPR_ROLES.map(function(r){
+    var x=s.roles[r.k], e=x.entry;
+    return '<div style="flex:1;text-align:center;padding:0 8px">'+
+      (x.valid&&e.sig?'<img src="'+e.sig+'" style="height:56px;max-width:100%;object-fit:contain;display:block;margin:0 auto 2px;background:#fff"/>':'<div style="height:56px"></div>')+
+      '<div style="border-top:1.5px solid #111;font-size:10px;padding-top:3px;font-weight:700">'+esc(r.label)+'</div>'+
+      '<div style="font-size:8px;color:#6b7280;margin-top:1px">'+(x.valid?esc(e.by||'')+' · '+ddmmyy_time(e.at):(x.stale?'Re-approval needed':'Pending'))+'</div></div>';
+  }).join('');
+  var latest=0;VP_FEST_APPR_ROLES.forEach(function(r){var e=s.roles[r.k].entry;if(e&&(e.at||0)>latest)latest=e.at;});
+  var stamp=s.full?vpStamp('APPROVED','General Secretary, Secretary,<br>Treasurer &amp; Vice President<br>'+ddmmyy_time(latest),'#0369a1','#eff6ff')
+    :vpStamp('FOR APPROVAL',s.count+' of '+vpFestApprN()+' approvals received<br>Awaiting board sign-off','#92600a','#fffbeb');
+  return '<div style="margin:22px 0 0;page-break-inside:avoid"><div style="font-size:11px;font-weight:700;color:#1a3a5c;text-align:center;letter-spacing:.3px;margin-bottom:14px">BOARD APPROVAL</div>'+
+    '<div style="display:flex;gap:6px">'+slots+'</div><div style="text-align:right;padding:14px 18px 0 0">'+stamp+'</div></div>';
+}
+
 function sendFestivalContribWhatsApp(){
   var festSel = document.getElementById('fc-fest-select');
   if(!festSel||!festSel.value){alert('Please select a festival');return;}
@@ -10450,7 +10543,8 @@ function sendFestivalContribWhatsApp(){
   var msg='*Vaishno Pearl — '+festSel.value+'*\n'+
     'Collected: '+vpInr(d.collected)+' ('+d.contribs.length+' contribution'+(d.contribs.length===1?'':'s')+')\n'+
     'Expenses: '+vpInr(d.spent)+'\n'+
-    'Balance: '+vpInr(d.balance);
+    'Balance: '+vpInr(d.balance)+'\n'+
+    (vpFestApprState(festSel.value).full?'Status: Approved by all board signatories':'Status: Awaiting approval ('+vpFestApprState(festSel.value).count+' of '+vpFestApprN()+')');
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
 }
 
@@ -10479,7 +10573,7 @@ function printFestivalContrib(){
     '<table><tr><th>#</th><th>Item</th><th>Date</th><th>Amount</th></tr>'+eRows+
     '<tr class="tot"><td colspan="3">Total Expenses</td><td class="r">'+vpInr(d.spent)+'</td></tr></table>';
   // Same document builder as receipts: logo header, QR code + unique Validation ID, validated stamp
-  openPdfWindow('Festival Report - '+fest, body+docSigs(), true);
+  openPdfWindow('Festival Report - '+fest, body+vpFestApprovalPrintHtml(fest), true);
 }
 
 function addFestivalContribution(){
