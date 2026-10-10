@@ -571,8 +571,10 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <button class="tab" onclick="goTab('outstanding',this)">⚠️ Outstanding</button>
   <button class="tab" onclick="goTab('collection',this)">🧾 Collection</button>
   <button class="tab" onclick="goTab('trends',this)">📈 Trends</button>
+  <button class="tab hidden" id="tab-compare" onclick="goTab('compare',this)">📊 Monthly Compare</button>
   <button class="tab" onclick="goTab('defaulters',this)">⚠️ Defaulters</button>
   <button class="tab" onclick="goTab('works',this)">🛠️ Work</button>
+  <button class="tab" onclick="goTab('workorders',this)">📝 Work Orders</button>
   <button class="tab" onclick="goTab('visitors',this)">🚶 Visitors</button>
   <button class="tab" onclick="goTab('staff',this)">👷 Staff</button>
   <button class="tab" onclick="goTab('tanker',this)">💧 Tanker</button>
@@ -1575,6 +1577,10 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <div class="sec">🎊 Festival Contributions by Flat</div>
   <div class="card">
     <div class="fg" style="margin-bottom:8px">
+      <label class="fl">📅 Year</label>
+      <select id="fc-year-select" onchange="vpFestYearChanged()"></select>
+    </div>
+    <div class="fg" style="margin-bottom:8px">
       <label class="fl">Select Festival</label>
       <select id="fc-fest-select" onchange="loadFestivalContributions()"></select>
     </div>
@@ -1609,6 +1615,10 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
         <label class="fl">Amount (₹)</label>
         <input type="number" id="fc-amount" placeholder="e.g. 500" min="0"/>
       </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Date received</label>
+      <input type="date" id="fc-date"/>
     </div>
     <div class="fg">
       <label class="fl">Payment Mode</label>
@@ -1768,6 +1778,75 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <div class="sec">Trend Analysis — every month</div>
   <div id="trends-wrap"></div>
 </div>
+<!-- ═══════════ MONTHLY PAYMENT COMPARISON (super admin only) ═══════════ -->
+<div class="view hidden" id="v-compare">
+  <div class="sec">📊 Monthly Payment Comparison</div>
+  <div class="card">
+    <div class="row2">
+      <div class="fg" style="flex:1;margin-bottom:0"><label class="fl">Month A</label><select id="cmp-a" onchange="rCompare()"></select></div>
+      <div class="fg" style="flex:1;margin-bottom:0"><label class="fl">Month B</label><select id="cmp-b" onchange="rCompare()"></select></div>
+    </div>
+  </div>
+  <div id="cmp-summary"></div>
+  <div id="cmp-flats"></div>
+  <div id="cmp-history"></div>
+  <button class="btn btn-p" style="margin-top:6px" onclick="prtCompare()">🖨️ Print Comparison</button>
+</div>
+
+<!-- ═══════════ WORK ORDERS (estimate + dual approval) ═══════════ -->
+<div class="view hidden" id="v-workorders">
+  <div class="sec">📝 Work Orders</div>
+  <div class="card" id="wo-form-card">
+    <div class="ctitle" id="wo-form-title">➕ New Work Order</div>
+    <div class="fg"><label class="fl">Work title</label><input type="text" id="wo-title" placeholder="e.g. Block A terrace waterproofing"/></div>
+    <div class="row2">
+      <div class="fg" style="flex:1"><label class="fl">Category</label>
+        <select id="wo-cat" onchange="woCatChanged()">
+          <option value="Painting Works">🎨 Painting Works</option>
+          <option value="Electrical Works">⚡ Electrical Works</option>
+          <option value="CCTV Cameras">📹 CCTV Cameras</option>
+          <option value="Civil Works">🧱 Civil Works</option>
+          <option value="Plumbing Works">🔧 Plumbing Works</option>
+          <option value="Other Works">➕ Other Works</option>
+        </select>
+      </div>
+      <div class="fg" style="flex:1"><label class="fl">Location / Block</label><input type="text" id="wo-loc" placeholder="e.g. Terrace, Block A"/></div>
+    </div>
+    <div class="fg hidden" id="wo-cat-other-wrap"><label class="fl">Type of work</label><input type="text" id="wo-cat-other" placeholder="e.g. Lift repair, Garden"/></div>
+    <div class="row2">
+      <div class="fg" style="flex:1"><label class="fl">Vendor / Contractor</label><input type="text" id="wo-vendor" placeholder="Name"/></div>
+      <div class="fg" style="flex:1"><label class="fl">Vendor phone</label><input type="tel" id="wo-vphone" placeholder="Phone"/></div>
+    </div>
+    <div class="fg"><label class="fl">Scope of work</label><textarea id="wo-desc" placeholder="What exactly will be done, materials, warranty…"></textarea></div>
+    <div class="row2">
+      <div class="fg" style="flex:1"><label class="fl">Expected start</label><input type="date" id="wo-start"/></div>
+      <div class="fg" style="flex:1"><label class="fl">Duration (days)</label><input type="number" id="wo-days" min="0" placeholder="e.g. 7"/></div>
+    </div>
+    <div class="sec" style="margin-top:4px">💰 Estimate</div>
+    <datalist id="wo-suggest"></datalist>
+    <div id="wo-items"></div>
+    <div class="row2" style="align-items:flex-end;margin-bottom:6px">
+      <div class="fg" style="flex:3;margin-bottom:0"><label class="fl">Item</label><input type="text" id="wo-i-desc" list="wo-suggest" placeholder="Item / work"/></div>
+      <div class="fg" style="flex:1;margin-bottom:0"><label class="fl">Qty</label><input type="number" id="wo-i-qty" min="0" step="any" placeholder="1"/></div>
+      <div class="fg" style="flex:1.4;margin-bottom:0"><label class="fl">Rate ₹</label><input type="number" id="wo-i-rate" min="0" step="any" placeholder="0"/></div>
+    </div>
+    <button class="btn btn-o btn-s" style="width:100%;margin-bottom:8px" onclick="woAddItem()">➕ Add item to estimate</button>
+    <div class="cfrow" style="margin-bottom:10px"><div class="cflb">Estimated total</div><div class="cfv" id="wo-total">₹0</div></div>
+    <button class="btn btn-p" id="wo-save-btn" onclick="saveWorkOrder()">💾 Save Work Order</button>
+    <button class="btn btn-o hidden" id="wo-cancel-btn" style="margin-top:8px" onclick="woCancelEdit()">Cancel edit</button>
+    <p style="font-size:11px;color:var(--muted);margin-top:8px">After saving, the General Secretary and Secretary must both approve with their signature before the work starts.</p>
+  </div>
+  <div class="mbar" style="margin-top:6px"><span style="font-size:12px;color:var(--muted);flex-shrink:0">🔎</span>
+    <select id="wo-filter" onchange="rWorkOrders()">
+      <option value="all">All work orders</option>
+      <option value="pending">Pending approval</option>
+      <option value="approved">Approved (in progress)</option>
+      <option value="done">Completed</option>
+    </select>
+  </div>
+  <div id="wo-list"></div>
+</div>
+
 <div class="view hidden" id="v-amc">
   <div class="sec">🔄 AMC Renewals</div>
   <div class="card" id="amc-form">
@@ -2670,6 +2749,7 @@ function load(){
     if(!parsed.festivals)parsed.festivals=[];
     if(!parsed.festivalContributions)parsed.festivalContributions=[];
     if(!parsed.festApprovals)parsed.festApprovals={};
+    if(!parsed.workOrders)parsed.workOrders=[];
     if(!parsed.festivalRates)parsed.festivalRates={};
     if(!parsed.authSign)parsed.authSign={name:'',desig:'Secretary',sig:''};
     if(parsed.backupEmail===undefined)parsed.backupEmail='';
@@ -4271,7 +4351,7 @@ function mergeData(ev){
       }
     });
     // add-only for list data
-    ['payments','documents','notices','queries','meetings','polls','visitors','staff','tankers','emergency','festivals','festivalContributions','committee','amcs'].forEach(function(key){
+    ['payments','documents','notices','queries','meetings','polls','visitors','staff','tankers','emergency','festivals','festivalContributions','workOrders','committee','amcs'].forEach(function(key){
       if(!Array.isArray(st[key]))st[key]=[];
       added.records+=_mergeArr(st[key],old[key]||[]);
     });
@@ -4643,6 +4723,7 @@ function vpMergeState(localSt,remoteSt){
   ['notices','queries','meetings','payments','documents','accessRequests','works','vehicles','festivals','festivalContributions'].forEach(function(key){
     merged[key]=vpMergeArraysById((localSt||{})[key],(remoteSt||{})[key],'id');
   });
+  merged.workOrders=vpMergeWorkOrders((localSt||{}).workOrders,(remoteSt||{}).workOrders);
   // festival approvals: keep every festival/role signature; if both sides have one, keep the newer
   merged.festApprovals={};
   [(remoteSt||{}).festApprovals,(localSt||{}).festApprovals].forEach(function(src){
@@ -5677,6 +5758,7 @@ function launch(){
     if(bulkFixCard)bulkFixCard.classList.toggle('hidden',!canEdit());
     const rmMonthCard=document.getElementById('rm-month-card');
     if(rmMonthCard){rmMonthCard.classList.toggle('hidden',!canEdit());if(canEdit())popRmMonths();}
+    var tabCmp=document.getElementById('tab-compare');if(tabCmp)tabCmp.classList.toggle('hidden',!isSuper());
     const saTools=document.getElementById('superadmin-tools');
     if(saTools){
       saTools.classList.toggle('hidden',!isSuper());
@@ -7143,6 +7225,8 @@ function goTab(id,btn){
   else if(id==='trends')rTrends();
   else if(id==='defaulters')rDefaulters();
   else if(id==='works')rWorks();
+  else if(id==='workorders')rWorkOrders();
+  else if(id==='compare')rCompare();
   else if(id==='reports')rVerifyStatus();
   else if(id==='amc')rAmc();
   else if(id==='compliance')rComplianceCerts();
@@ -9226,6 +9310,26 @@ function rMyFlat(){
       <div style="font-size:12px;color:var(--err);font-weight:600">⚠️ Your maintenance for ${lbl(k)} is pending. Please pay and inform the Treasurer to update your status.</div>
     </div>`:`<button class="btn btn-o" style="color:var(--P);margin-top:10px" onclick="prtMyReceiptFor('${k}')">🖨️ Receipt</button>`}`;
 
+  // ---- Carry forward (flat owner view) ----
+  (function(){
+    var prevKeys=allKeys().filter(function(kk){return st.months[kk]&&kk<k;}).sort();
+    var arrears=0,arrMonths=[];
+    prevKeys.forEach(function(kk){
+      var ff=(st.months[kk].flats||[]).find(function(x){return x.no===ownerFlat;});
+      if(ff&&!ff.paid){arrears+=st.mf;arrMonths.push(lbl(kk));}
+    });
+    var thisDue=paid?0:pen.total;
+    var socCF=calcCF(mkAdd(k,-1));
+    var cfHtml='<div class="card"><div class="ctitle">🔁 Carry Forward</div>'+
+      '<div class="sr"><span class="slb">Your dues carried forward</span><span style="font-weight:800;color:'+(arrears>0?'var(--err)':'var(--ok)')+'">'+fmt(arrears)+'</span></div>'+
+      (arrMonths.length?'<div style="font-size:10.5px;color:var(--muted);margin:-2px 0 6px">Unpaid: '+esc(arrMonths.join(', '))+'</div>':'<div style="font-size:10.5px;color:var(--ok);margin:-2px 0 6px">No earlier dues — all previous months paid ✓</div>')+
+      '<div class="sr"><span class="slb">'+esc(lbl(k))+' maintenance</span><span style="font-weight:600">'+(paid?'Paid ✓':fmt(thisDue))+'</span></div>'+
+      '<div class="sr tot"><span class="slb">Total outstanding</span><span style="color:'+((arrears+thisDue)>0?'var(--err)':'var(--ok)')+'">'+fmt(arrears+thisDue)+'</span></div>'+
+      '<div class="sr" style="margin-top:6px"><span class="slb">Society balance carried forward into '+esc(lbl(k))+'</span><span style="font-weight:700;color:'+(socCF>=0?'var(--P)':'var(--err)')+'">'+fmt(socCF)+'</span></div>'+
+    '</div>';
+    document.getElementById('myflat-status').insertAdjacentHTML('beforeend',cfHtml);
+  })();
+
   const keys=allKeys().filter(kk=>st.months[kk]).sort();
   let tp=0,td=0;
   const rows=keys.map(kk=>{
@@ -10381,16 +10485,11 @@ function loadFestivalContributions(){
   var festVal = festSel.value;
 
   // Filter contributions - try different field name possibilities
-  var allContribs = (st.festivalContributions||[]).filter(c=>{
-    var festName = c.festival || c.festName || c.name || c.festival_name || '';
-    return festName === festVal;
-  });
+  var _fd = vpFestReportData(festVal);
+  var allContribs = _fd.contribs;
 
   // Filter expenses - try different field name possibilities
-  var allFestExp = (st.festivals||[]).filter(e=>{
-    var festName = e.festival || e.festName || e.name || e.festival_name || '';
-    return festName === festVal;
-  });
+  var allFestExp = _fd.exps;
 
   var totalCollected = allContribs.reduce((s,c)=>s+parseFloat(c.amount||0),0);
   var totalExpense = allFestExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
@@ -10439,20 +10538,50 @@ function exportFestivalContribCSV(){
   var festSel = document.getElementById('fc-fest-select');
   if(!festSel||!festSel.value){alert('Please select a festival');return;}
   var csv = 'Flat No,Owner Name,Amount Contributed\n';
-  var contribs = (st.festivalContributions||[]).filter(c=>c.festival===festSel.value);
+  var contribs = vpFestReportData(festSel.value).contribs;
   contribs.forEach(c=>csv+='Flat '+c.flat+','+(c.name||'')+','+parseFloat(c.amount||0)+'\n');
   var blob = new Blob([csv],{type:'text/csv'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = festSel.value+'_Contributions.csv';
+  a.download = festSel.value+(vpSelYear()!=='all'?'_'+vpSelYear():'')+'_Contributions.csv';
   a.click();
 }
 
+// ---- Year filter for Festival Contributions ----
+function vpEntryYear(x){var t=x&&x.ts?new Date(x.ts):new Date();var y=t.getFullYear();return isNaN(y)?new Date().getFullYear():y;}
+function vpSelYear(){var s=document.getElementById('fc-year-select');return (s&&s.value)?s.value:'all';}
+function vpFestYears(){
+  var ys={};
+  (st.festivals||[]).forEach(function(e){ys[vpEntryYear(e)]=true;});
+  (st.festivalContributions||[]).forEach(function(c){ys[vpEntryYear(c)]=true;});
+  ys[new Date().getFullYear()]=true;
+  return Object.keys(ys).map(Number).sort(function(a,b){return b-a;});
+}
+function vpFestKey(fest){var y=vpSelYear();return y==='all'?fest:(fest+' · '+y);}
+function vpFestTitle(fest){var y=vpSelYear();return y==='all'?fest:(fest+' '+y);}
+function vpFillFestivalSelect(){
+  var festSel=document.getElementById('fc-fest-select');if(!festSel)return;
+  var prev=festSel.value, y=vpSelYear(), names=[];
+  var nm=function(x){return x.festival||x.festName||x.name||x.festival_name||'';};
+  [].concat(st.festivals||[],st.festivalContributions||[]).forEach(function(x){
+    var n=nm(x); if(!n)return;
+    if(y!=='all'&&String(vpEntryYear(x))!==y)return;
+    if(names.indexOf(n)<0)names.push(n);
+  });
+  names.sort();
+  if(!names.length){festSel.innerHTML='<option value="">— No festivals in '+(y==='all'?'any year':y)+' —</option>';return;}
+  festSel.innerHTML='<option value="">— Select Festival —</option>'+names.map(function(f){return '<option value="'+esc(f)+'">'+esc(f)+'</option>';}).join('');
+  if(prev&&names.indexOf(prev)>=0)festSel.value=prev;
+  else if(names.length===1)festSel.value=names[0];
+}
+function vpFestYearChanged(){vpFillFestivalSelect();loadFestivalContributions();}
 function vpFestReportData(festVal){
   var nm=function(x){return x.festival||x.festName||x.name||x.festival_name||'';};
-  var contribs=(st.festivalContributions||[]).filter(function(c){return nm(c)===festVal;});
-  var exps=(st.festivals||[]).filter(function(e){return nm(e)===festVal;});
+  var y=vpSelYear();
+  var yearOk=function(x){return y==='all'||String(vpEntryYear(x))===y;};
+  var contribs=(st.festivalContributions||[]).filter(function(c){return nm(c)===festVal&&yearOk(c);});
+  var exps=(st.festivals||[]).filter(function(e){return nm(e)===festVal&&yearOk(e);});
   var tc=contribs.reduce(function(s,c){return s+parseFloat(c.amount||0);},0);
   var te=exps.reduce(function(s,e){return s+parseFloat(e.amount||0);},0);
   return {contribs:contribs,exps:exps,collected:tc,spent:te,balance:tc-te};
@@ -10464,7 +10593,7 @@ var VP_FEST_APPR_ROLES=[{k:'gensec',label:'General Secretary'},{k:'secretary',la
 function vpFestApprN(){return VP_FEST_APPR_ROLES.length;}
 function vpFestSnap(d){return d.contribs.length+'|'+d.exps.length+'|'+Math.round(d.collected)+'|'+Math.round(d.spent);}
 function vpFestApprState(fest){
-  var a=(st.festApprovals||{})[fest]||{}, snap=vpFestSnap(vpFestReportData(fest)), out={snap:snap,count:0,roles:{}};
+  var a=(st.festApprovals||{})[vpFestKey(fest)]||{}, snap=vpFestSnap(vpFestReportData(fest)), out={snap:snap,count:0,roles:{}};
   VP_FEST_APPR_ROLES.forEach(function(r){
     var x=a[r.k]; if(x&&x.void)x=null; // withdrawn signatures are kept as dated 'void' markers so the withdrawal syncs
     var valid=!!(x&&x.snap===snap);
@@ -10503,8 +10632,9 @@ function approveFestival(role){
   openSigPad('Approve as '+rlabel, fest+' · Collected '+vpInr(d.collected)+' · Expenses '+vpInr(d.spent), function(sig){
     var now=Date.now(), who=(ROLES[currentRole]||{}).label||rlabel;
     st.festApprovals=st.festApprovals||{};
-    st.festApprovals[fest]=st.festApprovals[fest]||{};
-    st.festApprovals[fest][role]={by:who,at:now,sig:sig,snap:vpFestSnap(d)};
+    var fk=vpFestKey(fest);
+    st.festApprovals[fk]=st.festApprovals[fk]||{};
+    st.festApprovals[fk][role]={by:who,at:now,sig:sig,snap:vpFestSnap(d)};
     try{logAudit('approve',who,'Approved & signed festival report ('+rlabel+') · '+fest+' · Collected '+vpInr(d.collected)+' · Expenses '+vpInr(d.spent));}catch(e){}
     sv();vpRenderFestApproval();
     showToast('✅ Signed as '+rlabel+(vpFestApprState(fest).full?' · fully approved':''));
@@ -10515,8 +10645,8 @@ function withdrawFestApproval(role){
   if(!(canEdit()&&(currentRole===role||isSuper()))){showToast('Not allowed');return;}
   var fest=festSel.value, rlabel=(ROLES[role]||{}).label||role;
   if(!confirm('Withdraw the '+rlabel+' signature on the '+fest+' report?'))return;
-  st.festApprovals=st.festApprovals||{};st.festApprovals[fest]=st.festApprovals[fest]||{};
-  st.festApprovals[fest][role]={void:true,at:Date.now(),by:(ROLES[currentRole]||{}).label||rlabel};
+  st.festApprovals=st.festApprovals||{};var fk=vpFestKey(fest);st.festApprovals[fk]=st.festApprovals[fk]||{};
+  st.festApprovals[fk][role]={void:true,at:Date.now(),by:(ROLES[currentRole]||{}).label||rlabel};
   try{logAudit('approve',(ROLES[currentRole]||{}).label||rlabel,'Withdrew festival report approval ('+rlabel+') · '+fest);}catch(e){}
   sv();vpRenderFestApproval();showToast('Signature withdrawn');
 }
@@ -10536,11 +10666,363 @@ function vpFestApprovalPrintHtml(fest){
     '<div style="display:flex;gap:6px">'+slots+'</div><div style="text-align:right;padding:14px 18px 0 0">'+stamp+'</div></div>';
 }
 
+// ═══════════ MONTHLY PAYMENT COMPARISON (super admin) ═══════════
+function vpMonthStats(k){
+  var md=st.months[k]; if(!md)return null;
+  var flats=md.flats||[];
+  var paid=flats.filter(function(f){return f.paid;}).length;
+  var total=flats.length||(FD||[]).length;
+  var col=paid*st.mf;
+  var exp=(md.expenses||[]).reduce(function(a,e){return a+(e.amount||0);},0);
+  return {k:k,paid:paid,total:total,pending:total-paid,col:col,exp:exp,net:col-exp,cf:calcCF(k),pct:total?Math.round(paid/total*100):0};
+}
+function vpCmpKeys(){var cur=curKey();return Object.keys(st.months).filter(function(k){return /^\d{4}-\d{2}$/.test(k)&&k<=cur;}).sort();}
+function vpDeltaHtml(diff,fn,goodUp){
+  if(!diff)return '<span style="color:var(--muted)">—</span>';
+  var good=(diff>0)===goodUp;
+  return '<span style="font-weight:700;color:'+(good?'var(--ok)':'var(--err)')+'">'+(diff>0?'▲ +':'▼ −')+fn(Math.abs(diff))+'</span>';
+}
+function rCompare(){
+  var sum=document.getElementById('cmp-summary'),fl=document.getElementById('cmp-flats'),hi=document.getElementById('cmp-history');
+  if(!sum)return;
+  if(!isSuper()){
+    sum.innerHTML='<div class="card" style="text-align:center;color:var(--muted)">Only ManasaTech Innovations (Super Admin) can view this comparison.</div>';
+    if(fl)fl.innerHTML='';if(hi)hi.innerHTML='';return;
+  }
+  var keys=vpCmpKeys();
+  if(!keys.length){sum.innerHTML='<div class="card" style="text-align:center;color:var(--muted)">No monthly data yet.</div>';if(fl)fl.innerHTML='';if(hi)hi.innerHTML='';return;}
+  var sa=document.getElementById('cmp-a'),sb=document.getElementById('cmp-b');
+  var pa=sa.value,pb=sb.value, desc=keys.slice().reverse();
+  var opts=desc.map(function(k){return '<option value="'+k+'">'+esc(lbl(k))+'</option>';}).join('');
+  sa.innerHTML=opts;sb.innerHTML=opts;
+  sb.value=(pb&&keys.indexOf(pb)>=0)?pb:desc[0];
+  sa.value=(pa&&keys.indexOf(pa)>=0)?pa:(desc[1]||desc[0]);
+  var A=vpMonthStats(sa.value),B=vpMonthStats(sb.value);
+  var money=function(n){return fmt(n);}, num=function(n){return String(n);}, pct=function(n){return n+'%';};
+  var rows=[
+    ['Paid flats',A.paid+' / '+A.total,B.paid+' / '+B.total,B.paid-A.paid,num,true],
+    ['Pending flats',A.pending,B.pending,B.pending-A.pending,num,false],
+    ['Collection rate',A.pct+'%',B.pct+'%',B.pct-A.pct,pct,true],
+    ['Collected',fmt(A.col),fmt(B.col),B.col-A.col,money,true],
+    ['Expenses',fmt(A.exp),fmt(B.exp),B.exp-A.exp,money,false],
+    ['Net (collected − expenses)',fmt(A.net),fmt(B.net),B.net-A.net,money,true],
+    ['Closing carry forward',fmt(A.cf),fmt(B.cf),B.cf-A.cf,money,true]
+  ];
+  sum.innerHTML='<div class="card"><div class="ctitle">'+esc(lbl(A.k))+' vs '+esc(lbl(B.k))+'</div>'+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="text-align:left;color:var(--muted);font-size:10.5px"><th style="padding:5px 4px"></th><th style="padding:5px 4px">'+esc(lbl(A.k))+'</th><th style="padding:5px 4px">'+esc(lbl(B.k))+'</th><th style="padding:5px 4px">Change</th></tr>'+
+    rows.map(function(r){return '<tr style="border-top:1px solid var(--bdr)"><td style="padding:7px 4px;font-weight:600">'+r[0]+'</td><td style="padding:7px 4px">'+r[1]+'</td><td style="padding:7px 4px">'+r[2]+'</td><td style="padding:7px 4px">'+vpDeltaHtml(r[3],r[4],r[5])+'</td></tr>';}).join('')+
+    '</table></div></div>';
+  // flat-by-flat
+  var mdA=st.months[A.k],mdB=st.months[B.k],buckets={both:[],drop:[],gain:[],none:[]};
+  var rowsF=(FD||[]).map(function(f){
+    var fa=((mdA.flats||[]).find(function(x){return x.no===f.no;})||{}).paid?true:false;
+    var fb=((mdB.flats||[]).find(function(x){return x.no===f.no;})||{}).paid?true:false;
+    var tag=fa&&fb?'both':(fa&&!fb?'drop':(!fa&&fb?'gain':'none'));
+    buckets[tag].push(f.no);
+    var lab={both:'<span style="color:var(--ok)">Paid both</span>',drop:'<span style="color:var(--err);font-weight:700">Paid A, pending B</span>',gain:'<span style="color:var(--P);font-weight:700">Pending A, paid B</span>',none:'<span style="color:var(--err)">Pending both</span>'}[tag];
+    return '<tr style="border-top:1px solid var(--bdr)"><td style="padding:6px 4px;font-weight:700">'+esc(f.no)+'</td><td style="padding:6px 4px">'+esc(f.name||'')+'</td><td style="padding:6px 4px;text-align:center">'+(fa?'✓':'✗')+'</td><td style="padding:6px 4px;text-align:center">'+(fb?'✓':'✗')+'</td><td style="padding:6px 4px;font-size:11px">'+lab+'</td></tr>';
+  }).join('');
+  fl.innerHTML='<div class="card"><div class="ctitle">🏠 Flat-wise payment comparison</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:11px">'+
+      '<span class="bdg bp">Paid both: '+buckets.both.length+'</span><span class="bdg bn">Dropped: '+buckets.drop.length+'</span><span class="bdg" style="background:var(--PL);color:var(--P)">Improved: '+buckets.gain.length+'</span><span class="bdg bn">Pending both: '+buckets.none.length+'</span></div>'+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="text-align:left;color:var(--muted);font-size:10.5px"><th style="padding:5px 4px">Flat</th><th style="padding:5px 4px">Owner</th><th style="padding:5px 4px">'+esc(lbl(A.k))+'</th><th style="padding:5px 4px">'+esc(lbl(B.k))+'</th><th style="padding:5px 4px">Result</th></tr>'+rowsF+'</table></div></div>';
+  // month-by-month history
+  var prev=null,hrows=keys.map(function(k){
+    var s=vpMonthStats(k),d=prev?(s.col-prev.col):0,dp=(prev&&prev.col)?Math.round((s.col-prev.col)/prev.col*100):0;
+    var out='<tr style="border-top:1px solid var(--bdr)"><td style="padding:6px 4px;font-weight:600;white-space:nowrap">'+esc(lbl(k))+'</td><td style="padding:6px 4px">'+s.paid+'/'+s.total+'</td><td style="padding:6px 4px">'+fmt(s.col)+'</td><td style="padding:6px 4px">'+(prev?vpDeltaHtml(d,money,true)+(dp?' <span style="font-size:10px;color:var(--muted)">('+(dp>0?'+':'')+dp+'%)</span>':''):'—')+'</td><td style="padding:6px 4px">'+fmt(s.exp)+'</td><td style="padding:6px 4px;color:'+(s.cf>=0?'var(--ok)':'var(--err)')+'">'+fmt(s.cf)+'</td></tr>';
+    prev=s;return out;
+  }).reverse().join('');
+  hi.innerHTML='<div class="card"><div class="ctitle">📅 Month-by-month</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="text-align:left;color:var(--muted);font-size:10.5px"><th style="padding:5px 4px">Month</th><th style="padding:5px 4px">Paid</th><th style="padding:5px 4px">Collected</th><th style="padding:5px 4px">vs previous</th><th style="padding:5px 4px">Expenses</th><th style="padding:5px 4px">Carry fwd</th></tr>'+hrows+'</table></div></div>';
+}
+function prtCompare(){
+  if(!isSuper()){showToast('Only ManasaTech Innovations can print this');return;}
+  rCompare();
+  var a=document.getElementById('cmp-a').value,b=document.getElementById('cmp-b').value;
+  if(!a||!b){showToast('No data to print');return;}
+  var A=vpMonthStats(a),B=vpMonthStats(b);
+  var row=function(n,x,y,d,fn,gu){var good=d===0?'':((d>0)===gu?'g':'r');return '<tr><td>'+n+'</td><td>'+x+'</td><td>'+y+'</td><td class="'+good+'">'+(d===0?'—':(d>0?'+':'−')+fn(Math.abs(d)))+'</td></tr>';};
+  var m=function(n){return fmt(n);},c=function(n){return String(n);};
+  var body='<h2 style="margin-top:0">Monthly Payment Comparison – '+esc(lbl(a))+' vs '+esc(lbl(b))+'</h2>'+
+    '<table><tr><th>Description</th><th>'+esc(lbl(a))+'</th><th>'+esc(lbl(b))+'</th><th>Change</th></tr>'+
+    row('Paid flats',A.paid+' / '+A.total,B.paid+' / '+B.total,B.paid-A.paid,c,true)+
+    row('Pending flats',A.pending,B.pending,B.pending-A.pending,c,false)+
+    row('Collected',fmt(A.col),fmt(B.col),B.col-A.col,m,true)+
+    row('Expenses',fmt(A.exp),fmt(B.exp),B.exp-A.exp,m,false)+
+    row('Net',fmt(A.net),fmt(B.net),B.net-A.net,m,true)+
+    row('Closing carry forward',fmt(A.cf),fmt(B.cf),B.cf-A.cf,m,true)+'</table>'+
+    '<h2>Flat-wise</h2><table><tr><th>Flat</th><th>Owner</th><th>'+esc(lbl(a))+'</th><th>'+esc(lbl(b))+'</th></tr>'+
+    (FD||[]).map(function(f){
+      var fa=((st.months[a].flats||[]).find(function(x){return x.no===f.no;})||{}).paid,fb=((st.months[b].flats||[]).find(function(x){return x.no===f.no;})||{}).paid;
+      return '<tr><td>'+esc(f.no)+'</td><td>'+esc(f.name||'')+'</td><td class="'+(fa?'g':'r')+'">'+(fa?'Paid':'Pending')+'</td><td class="'+(fb?'g':'r')+'">'+(fb?'Paid':'Pending')+'</td></tr>';
+    }).join('')+'</table>';
+  openPdfWindow('Monthly Payment Comparison - '+lbl(a)+' vs '+lbl(b), body+docSigs(), true);
+}
+
+// ═══════════ WORK ORDERS: estimate + dual approval (General Secretary + Secretary) ═══════════
+var WO_APPR_ROLES=[{k:'gensec',label:'General Secretary'},{k:'secretary',label:'Secretary'}];
+var WO_ICON={'Painting Works':'🎨','Electrical Works':'⚡','CCTV Cameras':'📹','Civil Works':'🧱','Plumbing Works':'🔧'};
+var WO_SUGGEST={
+  'Painting Works':['Interior emulsion painting (sq ft)','Exterior weatherproof painting (sq ft)','Primer coat (sq ft)','Wall putty (sq ft)','Enamel on grills / railings','Terrace / parapet painting'],
+  'Electrical Works':['Wiring & conduit (point)','LED light fitting (nos)','MCB / DB replacement','Motor / pump panel repair','Earthing work','Street / common-area light'],
+  'CCTV Cameras':['IP camera 4MP (nos)','NVR 16-channel','Hard disk 4TB','Cabling & installation (per camera)','PoE switch','Monitor / display'],
+  'Civil Works':['Plastering (sq ft)','Terrace waterproofing (sq ft)','Tiling (sq ft)','Brick work (cu m)','Concrete / crack repair','Labour charges'],
+  'Plumbing Works':['Pipe replacement (m)','Tap / valve replacement','Overhead tank cleaning','Leak repair','Motor / pump service'],
+  'Other Works':[]
+};
+var woItems=[], woEditId=null;
+function woTotal(items){return (items||[]).reduce(function(a,i){return a+(Number(i.q)||0)*(Number(i.r)||0);},0);}
+function woCatChanged(){
+  var c=document.getElementById('wo-cat').value;
+  var ow=document.getElementById('wo-cat-other-wrap');if(ow)ow.classList.toggle('hidden',c!=='Other Works');
+  var dl=document.getElementById('wo-suggest');
+  if(dl)dl.innerHTML=(WO_SUGGEST[c]||[]).map(function(s){return '<option value="'+esc(s)+'"></option>';}).join('');
+}
+function woRenderItems(){
+  var box=document.getElementById('wo-items');
+  if(box){
+    box.innerHTML=woItems.length?('<div style="overflow-x:auto;margin-bottom:6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'+
+      woItems.map(function(i,ix){
+        return '<tr style="border-bottom:1px solid var(--bdr)"><td style="padding:6px 2px">'+esc(i.d)+'</td><td style="padding:6px 2px;white-space:nowrap">'+(Number(i.q)||0)+' × '+fmt(i.r)+'</td><td style="padding:6px 2px;font-weight:700;text-align:right">'+fmt((Number(i.q)||0)*(Number(i.r)||0))+'</td><td style="padding:6px 0 6px 6px"><button class="xbtn" onclick="woDelItem('+ix+')">×</button></td></tr>';
+      }).join('')+'</table></div>'):'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">No items yet — add the estimate lines below.</div>';
+  }
+  var t=document.getElementById('wo-total');if(t)t.textContent=fmt(woTotal(woItems));
+}
+function woAddItem(){
+  var d=(document.getElementById('wo-i-desc').value||'').trim();
+  var q=parseFloat(document.getElementById('wo-i-qty').value);if(isNaN(q)||q<=0)q=1;
+  var r=parseFloat(document.getElementById('wo-i-rate').value);
+  if(!d){showToast('Enter the item');return;}
+  if(isNaN(r)||r<0){showToast('Enter the rate');return;}
+  woItems.push({d:d,q:q,r:r});
+  ['wo-i-desc','wo-i-qty','wo-i-rate'].forEach(function(id){document.getElementById(id).value='';});
+  woRenderItems();
+}
+function woDelItem(i){woItems.splice(i,1);woRenderItems();}
+function woResetForm(){
+  woEditId=null;woItems=[];
+  ['wo-title','wo-loc','wo-cat-other','wo-vendor','wo-vphone','wo-desc','wo-start','wo-days','wo-i-desc','wo-i-qty','wo-i-rate'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+  var c=document.getElementById('wo-cat');if(c)c.value='Painting Works';
+  woCatChanged();woRenderItems();
+  var t=document.getElementById('wo-form-title');if(t)t.textContent='➕ New Work Order';
+  var b=document.getElementById('wo-save-btn');if(b)b.textContent='💾 Save Work Order';
+  var cb=document.getElementById('wo-cancel-btn');if(cb)cb.classList.add('hidden');
+}
+function woCancelEdit(){woResetForm();}
+function woNextNo(){
+  var y=new Date().getFullYear(),max=0;
+  (st.workOrders||[]).forEach(function(w){var m=/^WO-(\d{4})-(\d+)$/.exec(w.no||'');if(m&&Number(m[1])===y&&Number(m[2])>max)max=Number(m[2]);});
+  return 'WO-'+y+'-'+String(max+1).padStart(3,'0');
+}
+function saveWorkOrder(){
+  if(!canEdit()){showToast('Board access only for your role');return;}
+  var title=(document.getElementById('wo-title').value||'').trim();
+  var cat=document.getElementById('wo-cat').value;
+  if(cat==='Other Works'){var o=(document.getElementById('wo-cat-other').value||'').trim();if(o)cat=o;}
+  if(!title){showToast('Enter the work title');return;}
+  // an item typed but not added yet is added automatically
+  if((document.getElementById('wo-i-desc').value||'').trim()&&!isNaN(parseFloat(document.getElementById('wo-i-rate').value)))woAddItem();
+  if(!woItems.length){showToast('Add at least one estimate item');return;}
+  var now=Date.now(), who=(ROLES[currentRole]||{}).label||'Board';
+  var fields={
+    title:title,cat:cat,
+    loc:(document.getElementById('wo-loc').value||'').trim(),
+    vendor:(document.getElementById('wo-vendor').value||'').trim(),
+    vphone:(document.getElementById('wo-vphone').value||'').trim(),
+    desc:(document.getElementById('wo-desc').value||'').trim(),
+    start:document.getElementById('wo-start').value||'',
+    days:parseInt(document.getElementById('wo-days').value,10)||0,
+    items:woItems.map(function(i){return {d:i.d,q:i.q,r:i.r};}),
+    est:woTotal(woItems),updatedAt:now
+  };
+  st.workOrders=st.workOrders||[];
+  if(woEditId){
+    var w=st.workOrders.find(function(x){return x.id===woEditId;});
+    if(!w){woResetForm();return;}
+    if(vpWoApprState(w).count>0){showToast('Withdraw the signatures before editing');return;}
+    Object.keys(fields).forEach(function(k){w[k]=fields[k];});
+    try{logAudit('work',who,'Edited work order '+w.no+' · '+title+' · '+fmt(fields.est));}catch(e){}
+    showToast('✅ Work order updated');
+  }else{
+    var wo=Object.assign({id:now,no:woNextNo(),createdBy:who,createdAt:now,appr:{}},fields);
+    st.workOrders.unshift(wo);
+    try{logAudit('work',who,'Created work order '+wo.no+' · '+title+' · '+fmt(fields.est));}catch(e){}
+    showToast('✅ Work order '+wo.no+' created — awaiting approvals');
+  }
+  sv();woResetForm();rWorkOrders();
+}
+function woEdit(id){
+  var w=(st.workOrders||[]).find(function(x){return x.id===id;});if(!w)return;
+  if(!canEdit()){showToast('Board access only for your role');return;}
+  if(vpWoApprState(w).count>0){showToast('Withdraw the signatures before editing');return;}
+  woEditId=id;woItems=(w.items||[]).map(function(i){return {d:i.d,q:i.q,r:i.r};});
+  var std=['Painting Works','Electrical Works','CCTV Cameras','Civil Works','Plumbing Works'];
+  var isStd=std.indexOf(w.cat)>=0;
+  document.getElementById('wo-cat').value=isStd?w.cat:'Other Works';
+  document.getElementById('wo-cat-other').value=isStd?'':(w.cat==='Other Works'?'':w.cat);
+  woCatChanged();
+  document.getElementById('wo-title').value=w.title||'';
+  document.getElementById('wo-loc').value=w.loc||'';
+  document.getElementById('wo-vendor').value=w.vendor||'';
+  document.getElementById('wo-vphone').value=w.vphone||'';
+  document.getElementById('wo-desc').value=w.desc||'';
+  document.getElementById('wo-start').value=w.start||'';
+  document.getElementById('wo-days').value=w.days||'';
+  woRenderItems();
+  document.getElementById('wo-form-title').textContent='✏️ Edit '+w.no;
+  document.getElementById('wo-save-btn').textContent='💾 Update Work Order';
+  document.getElementById('wo-cancel-btn').classList.remove('hidden');
+  var f=document.getElementById('wo-form-card');if(f)f.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function vpWoSnap(w){return (w.items||[]).length+'|'+Math.round(woTotal(w.items))+'|'+(w.title||'');}
+function vpWoApprState(w){
+  var a=w.appr||{},snap=vpWoSnap(w),out={count:0,roles:{}};
+  WO_APPR_ROLES.forEach(function(r){
+    var x=a[r.k];if(x&&x.void)x=null;
+    var valid=!!(x&&x.snap===snap);
+    out.roles[r.k]={entry:x||null,valid:valid,stale:!!(x&&!valid)};
+    if(valid)out.count++;
+  });
+  out.full=out.count===WO_APPR_ROLES.length;
+  return out;
+}
+function approveWorkOrder(id,role){
+  var w=(st.workOrders||[]).find(function(x){return x.id===id;});if(!w)return;
+  if(!(canEdit()&&(currentRole===role||isSuper()))){showToast('Only the '+((ROLES[role]||{}).label||role)+' can sign this');return;}
+  var rlabel=(ROLES[role]||{}).label||role;
+  openSigPad('Approve as '+rlabel, w.no+' · '+w.title+' · Estimate '+fmt(w.est||woTotal(w.items)), function(sig){
+    var who=(ROLES[currentRole]||{}).label||rlabel;
+    w.appr=w.appr||{};
+    w.appr[role]={by:who,at:Date.now(),sig:sig,snap:vpWoSnap(w)};
+    try{logAudit('approve',who,'Approved & signed work order ('+rlabel+') '+w.no+' · '+w.title+' · '+fmt(w.est||0));}catch(e){}
+    sv();rWorkOrders();
+    showToast('✅ Signed as '+rlabel+(vpWoApprState(w).full?' · work order fully approved':''));
+  });
+}
+function withdrawWorkOrderApproval(id,role){
+  var w=(st.workOrders||[]).find(function(x){return x.id===id;});if(!w)return;
+  if(!(canEdit()&&(currentRole===role||isSuper()))){showToast('Not allowed');return;}
+  if(w.completedAt){showToast('Work already completed');return;}
+  var rlabel=(ROLES[role]||{}).label||role;
+  if(!confirm('Withdraw the '+rlabel+' signature on '+w.no+'?'))return;
+  w.appr=w.appr||{};
+  w.appr[role]={void:true,at:Date.now(),by:(ROLES[currentRole]||{}).label||rlabel};
+  try{logAudit('approve',(ROLES[currentRole]||{}).label||rlabel,'Withdrew work order approval ('+rlabel+') '+w.no);}catch(e){}
+  sv();rWorkOrders();showToast('Signature withdrawn');
+}
+function completeWorkOrder(id){
+  var w=(st.workOrders||[]).find(function(x){return x.id===id;});if(!w)return;
+  if(!canEdit()){showToast('Board access only for your role');return;}
+  if(!vpWoApprState(w).full){showToast('Needs both approvals first');return;}
+  var v=prompt('Final bill amount in ₹ (leave blank to use the estimate '+fmt(w.est||0)+')',String(Math.round(w.est||0)));
+  if(v===null)return;
+  var amt=parseFloat(v);if(isNaN(amt)||amt<0)amt=w.est||0;
+  var who=(ROLES[currentRole]||{}).label||'Board',now=Date.now();
+  w.completedAt=now;w.completedBy=who;w.actual=amt;w.updatedAt=now;
+  try{logAudit('work',who,'Completed work order '+w.no+' · '+w.title+' · final '+fmt(amt));}catch(e){}
+  sv();rWorkOrders();showToast('✅ Work order completed');
+}
+function deleteWorkOrder(id){
+  var w=(st.workOrders||[]).find(function(x){return x.id===id;});if(!w)return;
+  if(!canEdit()){showToast('Board access only for your role');return;}
+  if(vpWoApprState(w).count>0&&!isSuper()){showToast('Withdraw the signatures before deleting');return;}
+  if(!confirm('Delete work order '+w.no+'?'))return;
+  w.deleted=true;w.updatedAt=Date.now();
+  try{logAudit('work',(ROLES[currentRole]||{}).label||'Board','Deleted work order '+w.no+' · '+w.title);}catch(e){}
+  sv();rWorkOrders();showToast('Work order deleted');
+}
+function vpWoStatus(w){
+  var s=vpWoApprState(w);
+  if(w.completedAt)return {k:'done',label:'✅ Completed',bg:'var(--okB)',fg:'var(--ok)'};
+  if(s.full)return {k:'approved',label:'🛠️ Approved',bg:'var(--PL)',fg:'var(--P)'};
+  return {k:'pending',label:'⏳ '+s.count+' of '+WO_APPR_ROLES.length+' approvals',bg:'var(--warnB)',fg:'var(--warn)'};
+}
+function rWorkOrders(){
+  var box=document.getElementById('wo-list');if(!box)return;
+  var form=document.getElementById('wo-form-card');if(form)form.classList.toggle('hidden',!canEdit());
+  woCatChanged();woRenderItems();
+  var f=(document.getElementById('wo-filter')||{}).value||'all';
+  var list=(st.workOrders||[]).filter(function(w){return !w.deleted;}).filter(function(w){return f==='all'||vpWoStatus(w).k===f;});
+  if(!list.length){box.innerHTML='<div class="card" style="text-align:center;color:var(--muted)">No work orders'+(f==='all'?' yet':' in this filter')+'.</div>';return;}
+  box.innerHTML=list.map(function(w){
+    var s=vpWoApprState(w),stt=vpWoStatus(w);
+    var icon=WO_ICON[w.cat]||'🛠️';
+    var items='<details style="margin:6px 0"><summary style="font-size:12px;color:var(--P);font-weight:700;cursor:pointer">Estimate details ('+(w.items||[]).length+' items)</summary><table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:4px">'+
+      (w.items||[]).map(function(i){return '<tr style="border-bottom:1px solid var(--bdr)"><td style="padding:4px 2px">'+esc(i.d)+'</td><td style="padding:4px 2px;white-space:nowrap">'+(Number(i.q)||0)+' × '+fmt(i.r)+'</td><td style="padding:4px 2px;text-align:right;font-weight:700">'+fmt((Number(i.q)||0)*(Number(i.r)||0))+'</td></tr>';}).join('')+
+      '</table></details>';
+    var appr=WO_APPR_ROLES.map(function(r){
+      var x=s.roles[r.k],e=x.entry,canAct=canEdit()&&(currentRole===r.k||isSuper())&&!w.completedAt;
+      var status=x.valid?('<span style="color:var(--ok);font-weight:700">✅ '+esc(e.by||r.label)+'</span> <span style="font-size:10px;color:var(--muted)">'+ddmmyy_time(e.at)+'</span>'+(e.sig?'<br><img src="'+e.sig+'" style="height:34px;max-width:130px;object-fit:contain;background:#fff;border-radius:4px;margin-top:2px"/>':''))
+        :(x.stale?'<span style="color:var(--err);font-weight:700">⚠️ Estimate changed — re-sign</span>':'<span style="color:var(--muted)">⏳ Pending</span>');
+      var btn='';
+      if(canAct&&!x.valid)btn='<button class="tbtn" style="background:#0369a1;color:#fff;border-color:#0369a1" onclick="approveWorkOrder('+w.id+',\''+r.k+'\')">✍️ Sign</button>';
+      else if(canAct&&e)btn='<button class="tbtn" onclick="withdrawWorkOrderApproval('+w.id+',\''+r.k+'\')">↩ Withdraw</button>';
+      return '<div class="frow" style="margin-bottom:6px"><div class="fi"><div class="fno">'+esc(r.label)+'</div><div class="fnm" style="font-size:12px;font-weight:600">'+status+'</div></div><div class="fc">'+btn+'</div></div>';
+    }).join('');
+    var acts='<button class="btn btn-o btn-s" onclick="prtWorkOrderEst('+w.id+')">🖨️ Print</button>';
+    if(canEdit()&&s.full&&!w.completedAt)acts+=' <button class="btn btn-g btn-s" onclick="completeWorkOrder('+w.id+')">✅ Mark completed</button>';
+    if(canEdit()&&s.count===0)acts+=' <button class="btn btn-o btn-s" onclick="woEdit('+w.id+')">✏️ Edit</button>';
+    if(canEdit())acts+=' <button class="btn btn-o btn-s" style="color:var(--err)" onclick="deleteWorkOrder('+w.id+')">🗑️</button>';
+    return '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div style="font-size:10.5px;color:var(--muted);font-weight:700">'+esc(w.no)+' · '+icon+' '+esc(w.cat)+'</div><div style="font-size:14px;font-weight:800;margin-top:2px">'+esc(w.title)+'</div></div><span class="bdg" style="background:'+stt.bg+';color:'+stt.fg+';white-space:nowrap">'+stt.label+'</span></div>'+
+      (w.loc?'<div style="font-size:11.5px;color:var(--muted);margin-top:4px">📍 '+esc(w.loc)+'</div>':'')+
+      (w.vendor?'<div style="font-size:11.5px;color:var(--muted)">👷 '+esc(w.vendor)+(w.vphone?' · '+esc(w.vphone):'')+'</div>':'')+
+      (w.desc?'<div style="font-size:12px;margin-top:6px">'+esc(w.desc)+'</div>':'')+
+      '<div class="cfrow" style="margin:10px 0 4px"><div class="cflb">Estimate</div><div class="cfv">'+fmt(w.est||woTotal(w.items))+'</div></div>'+
+      (w.completedAt?'<div class="sr"><span class="slb">Final bill</span><span style="font-weight:800">'+fmt(w.actual||0)+'</span></div>':'')+
+      items+appr+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+acts+'</div>'+
+      '<div style="font-size:10px;color:var(--muted);margin-top:6px">Created by '+esc(w.createdBy||'')+' · '+ddmmyy_time(w.createdAt)+'</div></div>';
+  }).join('');
+}
+function prtWorkOrderEst(id){
+  var w=(st.workOrders||[]).find(function(x){return x.id===id;});if(!w)return;
+  var s=vpWoApprState(w);
+  var rows=(w.items||[]).map(function(i,ix){return '<tr><td>'+(ix+1)+'</td><td>'+esc(i.d)+'</td><td>'+(Number(i.q)||0)+'</td><td>'+fmt(i.r)+'</td><td>'+fmt((Number(i.q)||0)*(Number(i.r)||0))+'</td></tr>';}).join('');
+  var slots=WO_APPR_ROLES.map(function(r){
+    var x=s.roles[r.k],e=x.entry;
+    return '<div style="flex:1;text-align:center;padding:0 8px">'+(x.valid&&e.sig?'<img src="'+e.sig+'" style="height:56px;max-width:100%;object-fit:contain;display:block;margin:0 auto 2px;background:#fff"/>':'<div style="height:56px"></div>')+
+      '<div style="border-top:1.5px solid #111;font-size:10px;padding-top:3px;font-weight:700">'+esc(r.label)+'</div>'+
+      '<div style="font-size:8px;color:#6b7280;margin-top:1px">'+(x.valid?esc(e.by||'')+' · '+ddmmyy_time(e.at):(x.stale?'Re-approval needed':'Pending'))+'</div></div>';
+  }).join('');
+  var latest=0;WO_APPR_ROLES.forEach(function(r){var e=s.roles[r.k].entry;if(e&&(e.at||0)>latest)latest=e.at;});
+  var stamp=s.full?vpStamp('APPROVED','General Secretary + Secretary<br>'+ddmmyy_time(latest)+'<br>'+esc(w.no),'#0369a1','#eff6ff')
+    :vpStamp('FOR APPROVAL',s.count+' of '+WO_APPR_ROLES.length+' approvals received<br>Awaiting board sign-off','#92600a','#fffbeb');
+  var info=function(a,b){return '<tr><td style="width:32%;font-weight:700">'+a+'</td><td>'+b+'</td></tr>';};
+  var body='<h2 style="margin-top:0">Work Order – '+esc(w.no)+'</h2>'+
+    '<table>'+info('Work title',esc(w.title))+info('Category',esc(w.cat))+(w.loc?info('Location',esc(w.loc)):'')+
+      (w.vendor?info('Vendor / Contractor',esc(w.vendor)+(w.vphone?' · '+esc(w.vphone):'')):'')+
+      (w.start?info('Expected start',new Date(w.start+'T12:00:00').toLocaleDateString('en-IN')):'')+(w.days?info('Duration',w.days+' day(s)'):'')+
+      info('Raised by',esc(w.createdBy||'')+' · '+ddmmyy_time(w.createdAt))+'</table>'+
+    (w.desc?'<h2>Scope of work</h2><div style="font-size:11px;line-height:1.5;margin-bottom:8px">'+esc(w.desc).replace(/\n/g,'<br>')+'</div>':'')+
+    '<h2>Estimate</h2><table><tr><th>#</th><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr>'+rows+
+    '<tr class="tot"><td colspan="4">Total estimate</td><td>'+fmt(w.est||woTotal(w.items))+'</td></tr></table>'+
+    (w.completedAt?'<div style="font-size:11px;margin:6px 0">Completed '+ddmmyy_time(w.completedAt)+' · Final bill <b>'+fmt(w.actual||0)+'</b></div>':'')+
+    '<div style="margin:22px 0 0;page-break-inside:avoid"><div style="font-size:11px;font-weight:700;color:#1a3a5c;text-align:center;letter-spacing:.3px;margin-bottom:14px">DUAL APPROVAL</div>'+
+    '<div style="display:flex;gap:10px">'+slots+'</div><div style="text-align:right;padding:14px 18px 0 0">'+stamp+'</div></div>';
+  openPdfWindow('Work Order '+w.no, body, true);
+}
+function vpMergeWorkOrders(localArr,remoteArr){
+  var by={};
+  (remoteArr||[]).forEach(function(w){if(w&&w.id!=null)by[w.id]=w;});
+  (localArr||[]).forEach(function(l){
+    if(!l||l.id==null)return;
+    var r=by[l.id];
+    if(!r){by[l.id]=l;return;}
+    var base=((l.updatedAt||0)>=(r.updatedAt||0))?l:r,other=(base===l)?r:l;
+    var m=JSON.parse(JSON.stringify(base));
+    m.appr=m.appr||{};
+    var oa=other.appr||{};
+    Object.keys(oa).forEach(function(k){var cur=m.appr[k];if(!cur||((oa[k]||{}).at||0)>(cur.at||0))m.appr[k]=oa[k];});
+    by[l.id]=m;
+  });
+  return Object.keys(by).map(function(k){return by[k];}).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+}
+
 function sendFestivalContribWhatsApp(){
   var festSel = document.getElementById('fc-fest-select');
   if(!festSel||!festSel.value){alert('Please select a festival');return;}
   var d=vpFestReportData(festSel.value);
-  var msg='*Vaishno Pearl — '+festSel.value+'*\n'+
+  var msg='*Vaishno Pearl — '+vpFestTitle(festSel.value)+'*\n'+
     'Collected: '+vpInr(d.collected)+' ('+d.contribs.length+' contribution'+(d.contribs.length===1?'':'s')+')\n'+
     'Expenses: '+vpInr(d.spent)+'\n'+
     'Balance: '+vpInr(d.balance)+'\n'+
@@ -10561,7 +11043,7 @@ function printFestivalContrib(){
   }).join('')||'<tr><td colspan="4" style="text-align:center;color:#6b7280">No expenses recorded</td></tr>';
   var flats=(FD||[]).length, paidFlats={};
   d.contribs.forEach(function(c){paidFlats[c.flat]=true;});
-  var body='<h2 style="margin-top:0">Festival Report – '+esc(fest)+'</h2>'+
+  var body='<h2 style="margin-top:0">Festival Report – '+esc(vpFestTitle(fest))+'</h2>'+
     '<table><tr><th>Description</th><th>Details</th></tr>'+
     '<tr><td>Flats contributed</td><td>'+Object.keys(paidFlats).length+' of '+flats+'</td></tr>'+
     '<tr><td>Total collected</td><td class="g">'+vpInr(d.collected)+'</td></tr>'+
@@ -10573,7 +11055,7 @@ function printFestivalContrib(){
     '<table><tr><th>#</th><th>Item</th><th>Date</th><th>Amount</th></tr>'+eRows+
     '<tr class="tot"><td colspan="3">Total Expenses</td><td class="r">'+vpInr(d.spent)+'</td></tr></table>';
   // Same document builder as receipts: logo header, QR code + unique Validation ID, validated stamp
-  openPdfWindow('Festival Report - '+fest, body+vpFestApprovalPrintHtml(fest), true);
+  openPdfWindow('Festival Report - '+vpFestTitle(fest), body+vpFestApprovalPrintHtml(fest), true);
 }
 
 function addFestivalContribution(){
@@ -10598,6 +11080,11 @@ function addFestivalContribution(){
   // Get flat details
   var flat = (FD||[]).find(f=>f.no===flatNo);
 
+  // Date received (defaults to today); the year of this date decides which year the contribution belongs to
+  var dInp=document.getElementById('fc-date'), ts=Date.now();
+  if(dInp&&dInp.value){var pd=new Date(dInp.value+'T12:00:00').getTime();if(!isNaN(pd))ts=pd;}
+  if(ts>Date.now()+86400000){showToast('Date cannot be in the future');return;}
+
   // Add contribution
   st.festivalContributions = st.festivalContributions||[];
   st.festivalContributions.unshift({
@@ -10607,7 +11094,7 @@ function addFestivalContribution(){
     name: flat?flat.name:'',
     amount: amount,
     mode: mode,
-    ts: Date.now()
+    ts: ts
   });
 
   // Save and refresh
@@ -10617,10 +11104,15 @@ function addFestivalContribution(){
   if(amountInp) amountInp.value = '';
   if(flatSel) flatSel.value = '';
 
-  // Refresh display
+  // Refresh display; if the entry belongs to another year, switch to that year so it is visible
+  var ysel2=document.getElementById('fc-year-select'), ey=String(new Date(ts).getFullYear());
+  if(ysel2&&ysel2.value!=='all'&&ysel2.value!==ey){
+    var keep=festival; initFestivalContribTab(); ysel2.value=ey; vpFillFestivalSelect();
+    var fs=document.getElementById('fc-fest-select'); if(fs)fs.value=keep;
+  }
   loadFestivalContributions();
 
-  showToast('✅ Contribution recorded — Flat '+flatNo+' · ₹'+fmt(amount));
+  showToast('✅ Contribution recorded — Flat '+flatNo+' · '+fmt(amount));
 }
 
 function initFestivalContribAddForm(){
@@ -10660,45 +11152,17 @@ function initFlatExpensesTab(){
 }
 
 function initFestivalContribTab(){
-  // Populate festival select - read from correct data source (st, not vpState)
-  var festSel = document.getElementById('fc-fest-select');
-  if(festSel){
-    var allFestivals = [];
-
-    // Collect from st.festivals (festival expenses)
-    if(st.festivals && Array.isArray(st.festivals)){
-      st.festivals.forEach(e=>{
-        // Try different field names for festival
-        var festName = e.festival || e.festName || e.name || e.festival_name || '';
-        if(festName && !allFestivals.includes(festName)) {
-          allFestivals.push(festName);
-        }
-      });
-    }
-
-    // Collect from st.festivalContributions (contributions)
-    if(st.festivalContributions && Array.isArray(st.festivalContributions)){
-      st.festivalContributions.forEach(c=>{
-        var festName = c.festival || c.festName || c.name || c.festival_name || '';
-        if(festName && !allFestivals.includes(festName)) {
-          allFestivals.push(festName);
-        }
-      });
-    }
-
-    // Build dropdown
-    if(allFestivals.length > 0){
-      festSel.innerHTML = '<option value="">— Select Festival —</option>' +
-        allFestivals.sort().map(f=>`<option value="${f}">${f}</option>`).join('');
-    } else {
-      // If no festivals found, show message
-      festSel.innerHTML = '<option value="">— No festivals found —</option>';
-      console.warn('No festivals found in st.festivals or st.festivalContributions');
-      console.log('st.festivals:', st.festivals);
-      console.log('st.festivalContributions:', st.festivalContributions);
-    }
+  // Year selector (default: latest year that has data / current year), then festivals for that year
+  var ysel=document.getElementById('fc-year-select');
+  if(ysel){
+    var prevY=ysel.value, years=vpFestYears();
+    ysel.innerHTML=years.map(function(y){return '<option value="'+y+'">'+y+'</option>';}).join('')+'<option value="all">All years</option>';
+    var cur=String(new Date().getFullYear());
+    ysel.value=(prevY&&(prevY==='all'||years.indexOf(Number(prevY))>=0))?prevY:(years.indexOf(Number(cur))>=0?cur:String(years[0]));
   }
-
+  vpFillFestivalSelect();
+  var df=document.getElementById('fc-date');
+  if(df&&!df.value){var n=new Date();df.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
   loadFestivalContributions();
   initFestivalContribAddForm();
 }
@@ -10794,7 +11258,7 @@ function loadMyFestivalContrib(){
   // Get unique festivals with totals
   var festivals = {};
   myContribs.forEach(c => {
-    var festName = c.festival || 'Festival';
+    var festName = (c.festival || 'Festival')+' '+vpEntryYear(c);
     if(!festivals[festName]) {
       festivals[festName] = { total: 0, count: 0, entries: [] };
     }
@@ -10817,7 +11281,7 @@ function loadMyFestivalContrib(){
       var mode = c.mode || 'Cash';
       return `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid var(--bdr)">
         <div>
-          <div style="font-weight:600">${c.festival||'Festival'}</div>
+          <div style="font-weight:600">${c.festival||'Festival'} ${vpEntryYear(c)}</div>
           <div style="font-size:11px;color:var(--muted)">${dt} · ${mode}</div>
         </div>
         <div style="font-weight:700;color:var(--P)">₹${Math.round(parseFloat(c.amount||0)).toLocaleString('en-IN')}</div>
