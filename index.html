@@ -785,6 +785,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   <div class="row2" style="margin-bottom:12px">
     <button class="btn btn-g btn-s" id="btn-allpaid" onclick="allPaid()">✓ All Paid</button>
     <button class="btn btn-o btn-s" onclick="prtAllInvoices()">🧾 All Invoices</button>
+    <button class="btn btn-o btn-s" onclick="vpSharePick()">📥 Import Receipts</button>
     <button class="btn btn-s btn-o" onclick="allPend()">✗ All Pending</button>
     <div style="flex:1"></div>
     <span id="fs" style="font-size:11px;color:var(--muted);align-self:center"></span>
@@ -2482,6 +2483,25 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <p style="font-size:9px;color:var(--muted);margin-top:8px;text-align:center">Verification status, date &amp; time and officer are stamped digitally · © ManasaTech Innovations</p>
   </div>
 </div>
+<div class="vmodal hidden" id="vps-modal">
+  <div class="vcard">
+    <div class="ctitle">📥 Record Payment from Receipt <span id="vps-count" style="font-size:11px;color:var(--muted);font-weight:600"></span></div>
+    <img id="vps-img" alt="Receipt" style="width:100%;max-height:230px;object-fit:contain;background:var(--surf);border-radius:10px;margin-bottom:6px"/>
+    <div id="vps-status" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+    <div class="fg"><label class="fl">Flat</label><select id="vps-flat" onchange="vpShareFlatChanged()"></select></div>
+    <div class="fg"><label class="fl">Month</label><select id="vps-month"></select></div>
+    <div class="fg"><label class="fl">Amount Received (₹)</label><input type="number" id="vps-amount" min="0" step="1" placeholder="e.g. 2500"/></div>
+    <div class="fg"><label class="fl">Payment Date</label><input type="date" id="vps-date"/></div>
+    <div class="fg"><label class="fl">Paid Via</label><select id="vps-mode"></select></div>
+    <div class="fg"><label class="fl">UPI Ref / Txn ID</label><input type="text" id="vps-ref" placeholder="e.g. 412345678901"/></div>
+    <div class="row2">
+      <button class="btn btn-p btn-s" onclick="vpShareConfirm()">✅ Mark Paid &amp; Next</button>
+      <button class="btn btn-o btn-s" style="color:var(--P)" onclick="vpShareSkip()">Skip</button>
+      <button class="btn btn-o btn-s" style="color:var(--P)" onclick="vpShareClose()">Close</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="vps-pick" accept="image/*" multiple class="hidden" onchange="vpShareFromPicker(this)"/>
 <div class="vmodal hidden" id="payment-mode-modal" onclick="if(event.target===this)closePaymentModal()">
   <div class="vcard">
     <div class="ctitle"><span id="pm-title">💳 Confirm Payment</span> \u2014 Flat <span id="pm-flat-no"></span></div>
@@ -11906,6 +11926,147 @@ function initOutstandingTab(){
 }
 
   document.addEventListener('keydown',function(e){if(e.key==='Escape')vpCloseMenu();});
+})();
+</script>
+<script>
+/* ===== WhatsApp / UPI receipt import (Share-to-app + manual picker) ===== */
+(function(){
+var SHARE_ROLES=['treasurer','secretary','gensec','vp','manasa'];
+var q=[],qi=0,curUrl=null,done=0,ocrToken=0,tessP=null;
+function $(id){return document.getElementById(id);}
+window.vpCanShare=function(){return !!isAdmin&&SHARE_ROLES.indexOf(currentRole)>=0;};
+var MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function iso(y,m,d){y=+y;m=+m;d=+d;if(!(y>2000&&m>=1&&m<=12&&d>=1&&d<=31))return '';return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+window.vpShareParse=function(text){
+  var t=String(text||''),r={amount:'',ref:'',date:'',flat:''},m;
+  var re=/(?:₹|rs\.?|inr)\s*([\d,]+(?:\.\d{1,2})?)/gi;
+  while((m=re.exec(t))){var v=parseFloat(m[1].replace(/,/g,''));if(v>=100){r.amount=String(v);break;}}
+  if(!r.amount){var mf=String(st.mf||'');if(mf&&new RegExp('(^|[^\\d])'+mf.replace(/(\d)(?=(\d{3})+$)/g,'$1,?')+'([^\\d]|$)').test(t))r.amount=mf;}
+  m=t.match(/(?:upi\s*ref(?:erence)?(?:\s*(?:no|id))?\.?|utr(?:\s*no)?\.?|transaction\s*id|txn\s*id|ref(?:erence)?\s*(?:no|id)?\.?)[^\d]{0,14}(\d{10,16})/i)||t.match(/\b(\d{12})\b/);
+  if(m)r.ref=m[1];
+  var d=t.match(/\b(\d{1,2})[\s\-\/\.]*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-\/\.,]*(\d{4})\b/i);
+  if(d)r.date=iso(d[3],MON[d[2].toLowerCase()],d[1]);
+  if(!r.date){d=t.match(/\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\b/);if(d)r.date=iso(d[3],d[2],d[1]);}
+  if(!r.date){d=t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2}),?\s+(\d{4})\b/i);if(d)r.date=iso(d[3],MON[d[1].toLowerCase()],d[2]);}
+  if(r.date&&r.date>vpTodayIso())r.date='';
+  var low=t.toLowerCase(),hits=[];
+  FD.forEach(function(f){
+    if(new RegExp('(flat|apt|apartment)\\s*(no\\.?)?\\s*#?\\s*'+f.no+'\\b','i').test(t)){hits.push(f.no);return;}
+    var w=String(f.name||'').toLowerCase().split(/[^a-z]+/).filter(function(x){return x.length>=4;});
+    if(w.some(function(x){return low.indexOf(x)>=0;}))hits.push(f.no);
+  });
+  if(hits.length===1)r.flat=hits[0];
+  return r;
+};
+function earliestUnpaid(no){
+  var ks=allKeys().filter(function(k){return st.months[k]&&k<=curKey();}).sort();
+  for(var i=0;i<ks.length;i++){var f=st.months[ks[i]].flats.find(function(x){return x.no===no;});if(f&&!f.paid)return ks[i];}
+  return curKey();
+}
+window.vpShareFlatChanged=function(){
+  var no=$('vps-flat').value;if(!no)return;
+  var k=earliestUnpaid(no);var sel=$('vps-month');if(sel.querySelector('option[value="'+k+'"]'))sel.value=k;
+};
+window.vpSharePick=function(){
+  if(!vpCanShare()){showToast('Only Treasurer, Secretary, General Secretary or Vice President');return;}
+  $('vps-pick').value='';$('vps-pick').click();
+};
+window.vpShareFromPicker=function(inp){var fs=Array.prototype.slice.call(inp.files||[]);if(fs.length)vpShareOpen(fs);};
+window.vpShareOpen=function(files){
+  if(!vpCanShare()){showToast('Only Treasurer, Secretary, General Secretary or Vice President can record receipts');return;}
+  q=files;qi=0;done=0;
+  var ks=allKeys().filter(function(k){return st.months[k];}).sort().reverse();
+  $('vps-month').innerHTML=ks.map(function(k){return '<option value="'+k+'">'+esc(lbl(k))+'</option>';}).join('');
+  $('vps-flat').innerHTML='<option value="">— select flat —</option>'+FD.map(function(f){return '<option value="'+esc(f.no)+'">Flat '+esc(f.no)+' · '+esc(f.name||'')+'</option>';}).join('');
+  var mo='';Object.keys(PAYMENT_MODE_FEES).forEach(function(k){mo+='<option value="'+k+'">'+esc(PAYMENT_MODE_FEES[k].label)+'</option>';});
+  $('vps-mode').innerHTML=mo;
+  $('vps-modal').classList.remove('hidden');
+  vpShareLoad();
+};
+function loadTess(){
+  if(window.Tesseract)return Promise.resolve(window.Tesseract);
+  if(tessP)return tessP;
+  tessP=new Promise(function(res,rej){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=function(){res(window.Tesseract);};s.onerror=function(){tessP=null;rej(new Error('load'));};document.head.appendChild(s);});
+  return tessP;
+}
+function vpShareLoad(){
+  if(qi>=q.length){vpShareClose(true);return;}
+  if(curUrl){try{URL.revokeObjectURL(curUrl);}catch(e){}}
+  curUrl=URL.createObjectURL(q[qi]);
+  $('vps-img').src=curUrl;
+  $('vps-count').textContent='Receipt '+(qi+1)+' of '+q.length;
+  $('vps-amount').value='';$('vps-ref').value='';$('vps-date').value=vpTodayIso();$('vps-date').max=vpTodayIso();
+  $('vps-flat').value='';$('vps-mode').value='upi';
+  $('vps-month').value=curKey();
+  var tok=++ocrToken,blob=q[qi];
+  $('vps-status').textContent='🔍 Reading receipt…';
+  loadTess().then(function(T){return T.recognize(blob,'eng');}).then(function(res){
+    if(tok!==ocrToken)return;
+    var r=vpShareParse(res&&res.data&&res.data.text);
+    if(r.amount&&!$('vps-amount').value)$('vps-amount').value=r.amount;
+    if(r.ref&&!$('vps-ref').value)$('vps-ref').value=r.ref;
+    if(r.date)$('vps-date').value=r.date;
+    if(r.flat&&!$('vps-flat').value){$('vps-flat').value=r.flat;vpShareFlatChanged();}
+    var got=[r.amount&&'amount',r.date&&'date',r.ref&&'ref',r.flat&&'flat'].filter(Boolean);
+    $('vps-status').textContent=got.length?('✅ Read: '+got.join(', ')+' — please check before confirming'):'⚠️ Could not read details — please fill in manually';
+  }).catch(function(){if(tok===ocrToken)$('vps-status').textContent='⚠️ Auto-read unavailable (offline?) — please fill in manually';});
+}
+window.vpShareSkip=function(){qi++;vpShareLoad();};
+window.vpShareClose=function(finished){
+  ocrToken++;$('vps-modal').classList.add('hidden');
+  if(curUrl){try{URL.revokeObjectURL(curUrl);}catch(e){}curUrl=null;}
+  if(finished||done)showToast('✅ '+done+' payment'+(done===1?'':'s')+' recorded from receipts');
+  q=[];qi=0;
+};
+window.vpShareConfirm=function(){
+  if(!vpCanShare()){showToast('Not allowed for your role');return;}
+  var no=$('vps-flat').value,k=$('vps-month').value,amt=parseFloat($('vps-amount').value),dt=$('vps-date').value||vpTodayIso(),ref=$('vps-ref').value.trim(),mode=$('vps-mode').value;
+  if(!no){showToast('Select the flat');return;}
+  if(!k){showToast('Select the month');return;}
+  if(!amt||amt<=0){showToast('Enter the amount');return;}
+  if(dt>vpTodayIso()){showToast('Payment date cannot be in the future');return;}
+  var md=gmd(k),f=md.flats.find(function(x){return x.no===no;});
+  if(!f){showToast('Flat not found for that month');return;}
+  if(f.paid&&!confirm('Flat '+no+' is already marked Paid for '+lbl(k)+'. Overwrite its payment details?'))return;
+  if(ref){
+    var dup=null;allKeys().forEach(function(kk){if(st.months[kk])st.months[kk].flats.forEach(function(x){if(x.paid&&x.paidRef===ref&&!(x.no===no&&kk===k))dup=x.no+' / '+lbl(kk);});});
+    if(dup&&!confirm('This reference ('+ref+') is already recorded for Flat '+dup+'. Record anyway?'))return;
+  }
+  if(amt!==st.mf&&!confirm('Amount ₹'+amt+' differs from the monthly maintenance ₹'+st.mf+'. Record this amount?'))return;
+  var info=PAYMENT_MODE_FEES[mode]||{label:mode};
+  f.paid=true;
+  f.verifiedBy=(ROLES[currentRole]||{}).label||'Managing Committee';
+  f.verifiedAt=Date.now();
+  f.paidOn=vpIsoToTs(dt);f.paidRef=ref;f.payEditedAt=Date.now();
+  f.paymentMode=mode;f.paymentModeLabel=info.label;f.paidMethod=info.label;
+  f.amountReceived=amt;f.proofVia='WhatsApp receipt';
+  delete f.convenienceFee;delete f.convenienceFeeGST;
+  applyPenaltyOnPay(f,k);
+  try{logAudit('payment',f.verifiedBy,'Flat '+no+' · '+lbl(k)+' · ₹'+amt+' via '+info.label+' (WhatsApp receipt)'+(ref?' · Ref '+ref:''));}catch(e){}
+  sv();done++;
+  try{rFlats();rDash();}catch(e){}
+  qi++;vpShareLoad();
+};
+async function vpShareCheckPending(){
+  try{
+    if(!window.caches)return;
+    var c=await caches.open('vp-share'),ks=await c.keys();if(!ks.length)return;
+    var files=[],now=Date.now();
+    for(var i=0;i<ks.length;i++){
+      var rs=await c.match(ks[i]);if(!rs){continue;}
+      var at=+rs.headers.get('x-shared-at')||0;
+      if(now-at>2*86400000){await c.delete(ks[i]);continue;}
+      if(!vpCanShare())continue;
+      var b=await rs.blob();files.push(new File([b],'receipt-'+i,{type:b.type||'image/jpeg'}));
+      await c.delete(ks[i]);
+    }
+    if(files.length)vpShareOpen(files);
+    else if(!vpCanShare()&&(await c.keys()).length)showToast('Receipts waiting — log in as Treasurer, Secretary, General Secretary or Vice President to record them');
+  }catch(e){}
+}
+var _l=window.launch;
+if(typeof _l==='function'){window.launch=function(){var r=_l.apply(this,arguments);setTimeout(vpShareCheckPending,900);return r;};}
+window.vpShareCheckPending=vpShareCheckPending;
 })();
 </script>
 </body></html>
