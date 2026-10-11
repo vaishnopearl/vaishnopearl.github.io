@@ -2117,6 +2117,17 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <input type="file" id="xl-pick" accept=".xlsx,.xls" class="hidden" onchange="vpXlPickFile(this)"/>
     <div id="xl-preview" style="margin-top:10px"></div>
   </div>
+  <div class="card hidden" id="datactl-card">
+    <div class="ctitle">💾 Data Control (Super Admin)</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Save the app data, save a named copy anywhere you choose, or make a full backup (file + cloud copy). Tick “password” in the Backup section below to encrypt.</p>
+    <div class="row2">
+      <button class="btn btn-p btn-s" onclick="vpSaveNow()">💾 Save</button>
+      <button class="btn btn-o btn-s" style="color:var(--P)" onclick="vpSaveAs()">📂 Save As…</button>
+      <button class="btn btn-g btn-s" onclick="vpBackupNow()">🛡️ Backup now</button>
+    </div>
+    <div id="dc-status" style="font-size:11.5px;margin-top:8px"></div>
+    <div id="dc-list"></div>
+  </div>
   <div class="card hidden" id="oldfiles-card">
     <div class="ctitle">🗂️ Old Files (Super Admin)</div>
     <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Attach and keep past records — Excel sheets, PDFs, photos. Excel files can be imported into the app with one tap.</p>
@@ -5797,6 +5808,7 @@ function launch(){
     document.getElementById('pin-manage-card').classList.toggle('hidden',!canManagePins);
     {const xc=document.getElementById('xl-import-card');if(xc)xc.classList.toggle('hidden',!isSuper());}
     try{vpOldInit();}catch(e){}
+    try{vpDataCtlInit();}catch(e){}
     const accessCard=document.getElementById('access-ctrl-card');
     if(accessCard){accessCard.classList.toggle('hidden',!isSuper());if(isSuper()){rAccessRoles();rAccessFlats();}}
     const recurCard=document.getElementById('recur-manage-card');
@@ -5843,6 +5855,7 @@ function launch(){
     document.getElementById('pin-manage-card').classList.add('hidden');
     {const xc=document.getElementById('xl-import-card');if(xc)xc.classList.add('hidden');}
     {const oc=document.getElementById('oldfiles-card');if(oc)oc.classList.add('hidden');}
+    {const dc=document.getElementById('datactl-card');if(dc)dc.classList.add('hidden');}
     {const ac=document.getElementById('access-ctrl-card');if(ac)ac.classList.add('hidden');}
     document.getElementById('access-req-card').classList.add('hidden');
     document.getElementById('pass-manage-card').classList.add('hidden');
@@ -12307,6 +12320,87 @@ window.vpOldImport=async function(id){
   }catch(e){showToast('Could not open the stored file — download it and use "Choose Excel file" instead');}
 };
 window.vpOldInit=function(){var c=$('oldfiles-card');if(c)c.classList.toggle('hidden',!isSuper());vpOldRender();};
+})();
+</script>
+<script>
+/* ===== Super Admin: Save / Save As / Backup ===== */
+(function(){
+function $(i){return document.getElementById(i);}
+function ds(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function stamp(){var d=new Date();return ds()+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');}
+function status(h){var e=$('dc-status');if(e)e.innerHTML=h;}
+function who(){return (ROLES[currentRole]||{}).label||'Super Admin';}
+function audit(t){try{logAudit('backup',who(),t);}catch(e){}}
+async function payload(){
+  var json=JSON.stringify(st),enc=$('backup-encrypt-toggle')&&$('backup-encrypt-toggle').checked;
+  if(!enc)return {content:json,ext:'.json'};
+  var pw=prompt('Set a password for this backup (min 4 characters). You will need it to restore.');
+  if(!pw||pw.length<4){showToast('Password too short — cancelled');return null;}
+  return {content:await vpEncryptBackup(json,pw),ext:'.encrypted.json'};
+}
+function download(content,name){
+  var url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+  var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1500);
+}
+window.vpSaveNow=function(){
+  if(!isSuper()){showToast('Only ManasaTech Super Admin');return;}
+  sv();
+  status('✅ Saved on this device at '+ddmmyy_time()+(vpDB?' · cloud sync sent':' · offline — will sync when online'));
+  audit('Manual save');showToast('💾 Saved');
+};
+window.vpSaveAs=async function(){
+  if(!isSuper()){showToast('Only ManasaTech Super Admin');return;}
+  var base=prompt('Save as — file name:','VaishnoPearl-data-'+ds());
+  if(base==null)return;
+  base=base.replace(/[\\/:*?"<>|]+/g,'_').trim()||('VaishnoPearl-data-'+ds());
+  var p=await payload();if(!p)return;
+  var name=base.replace(/\.json$/i,'')+p.ext;
+  try{
+    if(window.showSaveFilePicker){
+      var h=await window.showSaveFilePicker({suggestedName:name,types:[{description:'Backup file',accept:{'application/json':['.json']}}]});
+      var w=await h.createWritable();await w.write(p.content);await w.close();
+      status('✅ Saved as <b>'+esc(h.name||name)+'</b> at '+ddmmyy_time());
+    }else{
+      download(p.content,name);status('✅ Saved as <b>'+esc(name)+'</b> (check your Downloads) at '+ddmmyy_time());
+    }
+    audit('Save As: '+name);showToast('📂 Saved as '+name);
+  }catch(e){
+    if(e&&e.name==='AbortError')return;
+    download(p.content,name);status('✅ Saved as <b>'+esc(name)+'</b> (Downloads) at '+ddmmyy_time());
+  }
+};
+window.vpBackupNow=async function(){
+  if(!isSuper()){showToast('Only ManasaTech Super Admin');return;}
+  var p=await payload();if(!p)return;
+  var name='VaishnoPearl-backup-'+stamp()+p.ext;
+  download(p.content,name);
+  var cloud='';
+  if(vpStorage){
+    try{
+      await vpStorage.ref().child('documents/_backups/'+name).putString(p.content,'raw',{contentType:'application/json'});
+      cloud=' · ☁️ copy stored in cloud';
+    }catch(e){cloud=' · ⚠️ cloud copy failed (file still downloaded)';}
+  }else cloud=' · ☁️ offline — file only';
+  status('✅ Backup <b>'+esc(name)+'</b> at '+ddmmyy_time()+cloud);
+  audit('Backup now: '+name+cloud);showToast('🛡️ Backup done');
+  vpBackupList();
+};
+window.vpBackupList=async function(){
+  var box=$('dc-list');if(!box)return;
+  if(!vpStorage){box.innerHTML='';return;}
+  try{
+    var res=await vpStorage.ref().child('documents/_backups').listAll();
+    var items=res.items.slice().sort(function(a,b){return a.name<b.name?1:-1;}).slice(0,6);
+    box.innerHTML=items.length?'<div style="font-size:11px;color:var(--muted);margin:10px 0 4px">Cloud backups (latest 6)</div>'+items.map(function(it,i){
+      return '<div class="litem"><div style="font-size:12px;word-break:break-all">🗄️ '+esc(it.name)+'</div><button class="tbtn" data-i="'+i+'">⬇️ Download</button></div>';
+    }).join(''):'';
+    box.querySelectorAll('button[data-i]').forEach(function(b){b.onclick=async function(){
+      try{var it=items[+b.getAttribute('data-i')];var u=await it.getDownloadURL();var r=await fetch(u);download(await r.text(),it.name);}catch(e){showToast('Could not download');}
+    };});
+  }catch(e){box.innerHTML='';}
+};
+window.vpDataCtlInit=function(){var c=$('datactl-card');if(c){c.classList.toggle('hidden',!isSuper());if(isSuper())vpBackupList();}};
 })();
 </script>
 </body></html>
