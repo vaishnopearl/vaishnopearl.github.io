@@ -2129,8 +2129,8 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div id="dc-list"></div>
   </div>
   <div class="card hidden" id="oldfiles-card">
-    <div class="ctitle">🗂️ Old Files</div>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Attach and keep past records — Excel sheets, PDFs, photos. Board members can attach and open files; only the ManasaTech Super Admin can import Excel data or delete other people's files.</p>
+    <div class="ctitle" id="old-title">🗂️ Old Files</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Attach and keep past records — Excel sheets, PDFs, photos. Files attached by board members go to the ManasaTech Super Admin for approval first. Once approved they are visible to all board members. Only the Super Admin imports Excel data.</p>
     <div class="fg"><label class="fl">Note (optional)</label><input type="text" id="old-note" placeholder="e.g. Maintenance sheets 2024–2025"/></div>
     <input type="file" id="old-file" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.csv,.doc,.docx" onchange="vpOldAdd(this)" style="margin-bottom:10px"/>
     <div id="old-list"></div>
@@ -4779,7 +4779,7 @@ function vpMergeState(localSt,remoteSt){
     merged[key]=vpMergeArraysById((localSt||{})[key],(remoteSt||{})[key],'id');
   });
   merged.workOrders=vpMergeWorkOrders((localSt||{}).workOrders,(remoteSt||{}).workOrders);
-  (function(){var m={};[(remoteSt||{}).oldFiles,(localSt||{}).oldFiles].forEach(function(a){(a||[]).forEach(function(x){if(!x||x.id==null)return;var c=m[x.id];if(!c)m[x.id]=x;else if(x.deleted&&!c.deleted)m[x.id]=x;});});merged.oldFiles=Object.keys(m).map(function(k){return m[k];});})();
+  (function(){var m={};[(remoteSt||{}).oldFiles,(localSt||{}).oldFiles].forEach(function(a){(a||[]).forEach(function(x){if(!x||x.id==null)return;var c=m[x.id];if(!c)m[x.id]=x;else if(x.deleted&&!c.deleted)m[x.id]=x;else if(!x.deleted&&!c.deleted&&(x.upAt||x.addedAt||0)>(c.upAt||c.addedAt||0))m[x.id]=x;});});merged.oldFiles=Object.keys(m).map(function(k){return m[k];});})();
   // festival approvals: keep every festival/role signature; if both sides have one, keep the newer
   merged.festApprovals={};
   [(remoteSt||{}).festApprovals,(localSt||{}).festApprovals].forEach(function(src){
@@ -12265,17 +12265,21 @@ window.vpXlPickFile=function(inp){
   var rd=new FileReader();rd.onload=function(){parseBuffer(rd.result,f.name);};rd.readAsArrayBuffer(f);
 };
 /* ----- Old Files archive ----- */
-function visible(){return (st.oldFiles||[]).filter(function(x){return !x.deleted;}).sort(function(a,b){return b.addedAt-a.addedAt;});}
+function mine(x){return x.addedByRole&&x.addedByRole===currentRole;}
+function visible(){return (st.oldFiles||[]).filter(function(x){return !x.deleted&&(isSuper()||x.status==null||x.status==='approved'||mine(x));}).sort(function(a,b){return b.addedAt-a.addedAt;});}
+function pendingCount(){return (st.oldFiles||[]).filter(function(x){return !x.deleted&&x.status==='pending';}).length;}
 function size(n){return n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';}
 function icon(f){var t=(f.type||'')+f.name.toLowerCase();return t.indexOf('pdf')>=0?'📕':t.indexOf('image')>=0||/\.(jpg|jpeg|png)$/.test(t)?'🖼️':/\.xlsx?$|sheet|excel/.test(t)?'📊':'📄';}
 window.vpOldRender=function(){
   var box=$('old-list');if(!box)return;
   var l=visible();
   box.innerHTML=l.length?l.map(function(f){
-    var isX=/\.xlsx?$/i.test(f.name);
-    return '<div class="litem" style="flex-wrap:wrap;gap:6px"><div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:700;word-break:break-all">'+icon(f)+' '+esc(f.name)+'</div><div style="font-size:10.5px;color:var(--muted)">'+size(f.size||0)+' · '+esc(ddmmyy(f.addedAt))+' · '+esc(f.addedBy||'')+(f.note?' · '+esc(f.note):'')+'</div></div>'
+    var isX=/\.xlsx?$/i.test(f.name),ap=(f.status==null||f.status==='approved');
+    var chip=ap?'':(f.status==='pending'?'<span style="background:#fef3c7;color:#92600a;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800">⏳ Awaiting Super Admin</span>':'<span style="background:#fee2e2;color:#a11;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800">✗ Rejected</span>');
+    return '<div class="litem" style="flex-wrap:wrap;gap:6px"><div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:700;word-break:break-all">'+icon(f)+' '+esc(f.name)+'</div><div style="font-size:10.5px;color:var(--muted)">'+size(f.size||0)+' · '+esc(ddmmyy(f.addedAt))+' · '+esc(f.addedBy||'')+(f.note?' · '+esc(f.note):'')+'</div>'+(chip?'<div style="margin-top:3px">'+chip+'</div>':'')+'</div>'
       +'<button class="tbtn" onclick="vpOldOpen(\''+f.id+'\')">Open</button>'
-      +(isX&&isSuper()?'<button class="tbtn" style="background:#15803d;color:#fff;border-color:#15803d" onclick="vpOldImport(\''+f.id+'\')">📊 Import</button>':'')
+      +(isSuper()&&f.status==='pending'?'<button class="tbtn" style="background:#15803d;color:#fff;border-color:#15803d" onclick="vpOldReview(\''+f.id+'\',true)">✓ Approve</button><button class="tbtn" style="color:#a11" onclick="vpOldReview(\''+f.id+'\',false)">✗ Reject</button>':'')
+      +(isX&&isSuper()&&ap?'<button class="tbtn" style="background:#15803d;color:#fff;border-color:#15803d" onclick="vpOldImport(\''+f.id+'\')">📊 Import</button>':'')
       +((isSuper()||(canEdit()&&f.addedByRole===currentRole))?'<button class="tbtn" style="color:#a11" onclick="vpOldDel(\''+f.id+'\')">🗑️</button>':'')+'</div>';
   }).join(''):'<div style="font-size:12px;color:var(--muted)">No old files yet. Attach Excel sheets, PDFs or photos from past records.</div>';
 };
@@ -12288,7 +12292,7 @@ window.vpOldAdd=async function(inp){
     var f=files[i];
     if(f.size>20*1024*1024){showToast(f.name+' is over 20 MB');continue;}
     showToast('Uploading '+f.name+'…',5000);
-    var rec={id:uid(),name:f.name,type:f.type||'',size:f.size,addedAt:Date.now(),addedBy:(ROLES[currentRole]||{}).label||'Board',addedByRole:currentRole,note:note};
+    var rec={id:uid(),name:f.name,type:f.type||'',size:f.size,addedAt:Date.now(),addedBy:(ROLES[currentRole]||{}).label||'Board',addedByRole:currentRole,note:note,status:isSuper()?'approved':'pending',upAt:Date.now()};
     var stored=await vpStoreFile(f,'documents');
     if(stored){rec.url=stored.url;rec.path=stored.path;}
     else if(f.size<=600*1024){rec.data=await vpReadAsDataURL(f);}
@@ -12297,15 +12301,22 @@ window.vpOldAdd=async function(inp){
     window.vpOldMem=window.vpOldMem||{};window.vpOldMem[rec.id]=f;
   }
   inp.value='';$('old-note').value='';
-  if(n){try{logAudit('doc',(ROLES[currentRole]||{}).label||'Board','Old files attached: '+n);}catch(e){}sv();showToast('✅ '+n+' file(s) saved');}
+  if(n){try{logAudit('doc',(ROLES[currentRole]||{}).label||'Board','Old files attached: '+n+(isSuper()?'':' (sent to Super Admin for approval)'));}catch(e){}sv();showToast(isSuper()?('✅ '+n+' file(s) saved'):('✅ '+n+' file(s) sent to Super Admin for approval'));}
   vpOldRender();
 };
-window.vpOldOpen=function(id){var f=find(id);if(!f)return;var u=f.url||f.data;if(!u){showToast('File not available');return;}window.open(u,'_blank');};
+window.vpOldReview=function(id,yes){
+  if(!isSuper()){showToast('Only ManasaTech Super Admin');return;}
+  var f=find(id);if(!f)return;
+  f.status=yes?'approved':'rejected';f.reviewedBy=(ROLES[currentRole]||{}).label||'Super Admin';f.reviewedAt=Date.now();f.upAt=Date.now();
+  try{logAudit('doc',f.reviewedBy,'Old file '+(yes?'approved':'rejected')+': '+f.name+' (from '+(f.addedBy||'')+')');}catch(e){}
+  sv();vpOldRender();vpOldTitle();showToast(yes?'✅ Approved — visible to all board members':'Rejected');
+};
+window.vpOldOpen=function(id){var f=find(id);if(!f)return;if(f.status==='pending'&&!isSuper()&&!mine(f)){showToast('Awaiting Super Admin approval');return;}var u=f.url||f.data;if(!u){showToast('File not available');return;}window.open(u,'_blank');};
 window.vpOldDel=function(id){
   var f=find(id);if(!f)return;
   if(!(isSuper()||(canEdit()&&f.addedByRole&&f.addedByRole===currentRole))){showToast('Only the Super Admin or the person who attached it can delete');return;}
   if(!confirm('Delete "'+f.name+'" for everyone?'))return;
-  f.deleted=true;f.deletedAt=Date.now();delete f.data;
+  f.deleted=true;f.deletedAt=Date.now();f.upAt=Date.now();delete f.data;
   if(f.path){try{vpDeleteStoredFile(f.path);}catch(e){}}
   sv();vpOldRender();showToast('🗑️ Deleted');
 };
@@ -12320,7 +12331,9 @@ window.vpOldImport=async function(id){
     var c=$('xl-import-card');if(c)c.scrollIntoView({behavior:'smooth'});
   }catch(e){showToast('Could not open the stored file — download it and use "Choose Excel file" instead');}
 };
-window.vpOldInit=function(){var c=$('oldfiles-card');if(c)c.classList.toggle('hidden',!canEdit());vpOldRender();};
+window.vpOldTitle=function(){var t=$('old-title');if(!t)return;var n=pendingCount();t.textContent='🗂️ Old Files'+((isSuper()&&n)?(' — '+n+' awaiting your approval'):'');};
+var toasted=false;
+window.vpOldInit=function(){var c=$('oldfiles-card');if(c)c.classList.toggle('hidden',!canEdit());vpOldRender();vpOldTitle();if(isSuper()&&pendingCount()&&!toasted){toasted=true;setTimeout(function(){showToast('🗂️ '+pendingCount()+' old file(s) awaiting your approval (Settings)',4000);},1500);}};
 })();
 </script>
 <script>
