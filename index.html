@@ -537,6 +537,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
       <p id="app-sub">Maintenance System</p>
     </div>
     <button class="rbadge" id="rbadge" onclick="logoutConfirm()">👤 Admin</button>
+    <button class="rbadge" id="btn-logout" onclick="logoutConfirm()" title="Log out" style="margin-left:6px;background:#dc2626;border-color:#ef4444">⏻ Logout</button>
   </div>
 </div>
 <div class="vp-menubar"><button class="vp-hamb" type="button" aria-label="Open menu" onclick="vpOpenMenu()"><i></i><i></i><i></i></button><span class="vp-cur" id="vp-cur">📊 Dashboard</span></div>
@@ -5745,7 +5746,7 @@ function launch(){
 
   if(isAdmin){
     const r=ROLES[currentRole];
-    document.getElementById('rbadge').textContent=r.icon+' '+r.label+'  ⎋ Logout';
+    document.getElementById('rbadge').textContent=r.icon+' '+r.label;
     document.getElementById('app-sub').textContent=(isSuper()?r.label+' · Super Admin (Full Control)':(currentRole==='member'?r.label+' · View Only':r.label+' · Full Access'));
     document.getElementById('board-tabs').classList.remove('hidden');
     document.getElementById('owner-tabs').classList.add('hidden');
@@ -5790,7 +5791,7 @@ function launch(){
     goTab('dash',document.querySelector('#board-tabs .tab'));
   }else{
     const flat=FD.find(f=>f.no===ownerFlat);
-    document.getElementById('rbadge').textContent='👁 Flat '+ownerFlat+'  ⎋ Logout';
+    document.getElementById('rbadge').textContent='👁 Flat '+ownerFlat;
     document.getElementById('app-sub').textContent=flat.name+' · View Only';
     document.getElementById('owner-tabs').classList.remove('hidden');
     document.getElementById('board-tabs').classList.add('hidden');
