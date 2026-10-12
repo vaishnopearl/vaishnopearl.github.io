@@ -50,6 +50,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 .tbt p{font-size:10px;opacity:.72;margin-top:1px;font-weight:500}
 .rbadge{margin-left:auto;font-size:10.5px;font-weight:700;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);color:#fff;padding:5px 11px;border-radius:999px;cursor:pointer;font-family:inherit;flex-shrink:0;align-self:center;transition:background .15s}
 .rbadge:active{background:rgba(255,255,255,.3)}
+.rbadge{max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbi{min-width:0}.tbt{min-width:0;flex:1 1 auto}
+#vp-logout-bar{padding:18px 16px calc(24px + env(safe-area-inset-bottom,0px));max-width:100%;box-sizing:border-box}
+#vp-logout-bar button{width:100%;display:block;background:#dc2626;color:#fff;border:0;border-radius:14px;padding:14px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 3px 10px rgba(220,38,38,.35)}
+#vp-logout-bar button:active{background:#b91c1c}
+@media print{#vp-logout-bar{display:none!important}}
+
 .tabbar{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;background:var(--white);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--bdr);max-height:112px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .tabbar::-webkit-scrollbar{display:none}
 .tab{flex:0 0 auto;padding:11px 14px 10px;font-size:11.5px;font-weight:600;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;font-family:inherit;white-space:nowrap;transition:color .15s}
@@ -537,7 +544,6 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
       <p id="app-sub">Maintenance System</p>
     </div>
     <button class="rbadge" id="rbadge" onclick="logoutConfirm()">👤 Admin</button>
-    <button class="rbadge" id="btn-logout" onclick="logoutConfirm()" title="Log out" style="margin-left:6px;background:#dc2626;border-color:#ef4444">⏻ Logout</button>
   </div>
 </div>
 <div class="vp-menubar"><button class="vp-hamb" type="button" aria-label="Open menu" onclick="vpOpenMenu()"><i></i><i></i><i></i></button><span class="vp-cur" id="vp-cur">📊 Dashboard</span></div>
@@ -12422,5 +12428,11 @@ window.vpBackupList=async function(){
 };
 window.vpDataCtlInit=function(){var c=$('datactl-card');if(c){c.classList.toggle('hidden',!isSuper());if(isSuper())vpBackupList();}};
 })();
+</script>
+<script>
+/* Logout button at the bottom of every page */
+(function(){function add(){var a=document.getElementById('app');if(!a||document.getElementById('vp-logout-bar'))return;
+var d=document.createElement('div');d.id='vp-logout-bar';d.innerHTML='<button type="button" onclick="logoutConfirm()">⏻ Logout</button>';a.appendChild(d);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add);else add();})();
 </script>
 </body></html>
