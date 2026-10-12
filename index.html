@@ -12943,7 +12943,32 @@ function vpCfChart(D,hl){
   D.forEach(function(d,i){var bwid=Math.min(16,bw*.5),y1=Y(Math.max(d.net,0)),y2=Y(Math.min(d.net,0));g+='<rect x="'+(X(i)-bwid/2)+'" y="'+y1+'" width="'+bwid+'" height="'+Math.max(1,y2-y1)+'" rx="3" fill="url(#'+(d.net>=0?'cfG':'cfR')+')" opacity=".9"/>';});
   g+='<polyline points="'+pts+'" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
   D.forEach(function(d,i){var on=d.k===hl;g+='<circle cx="'+X(i)+'" cy="'+Y(d.cl)+'" r="'+(on?5:3)+'" fill="#fff" stroke="#d97706" stroke-width="2"/>';if(n<=14||i%2===0)g+='<text x="'+X(i)+'" y="'+(H-10)+'" font-size="8" fill="'+(on?'#d97706':'#6b7280')+'" font-weight="'+(on?800:400)+'" text-anchor="middle">'+lbl(d.k).slice(0,3)+'</text>';});
-  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+g+'</svg>';
+  window.__cfG={W:W,H:H,pl:pl,pr:pr,pt:pt,pb:pb,bw:bw,n:n,Y:Y,X:X};
+  g+='<g id="vp-cf-ov" style="pointer-events:none"></g>';
+  return '<div id="vp-cf-wrap" style="position:relative;touch-action:pan-y;user-select:none;-webkit-user-select:none"><svg id="vp-cf-svg" viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;cursor:ew-resize">'+g+'</svg><div id="vp-cf-tip" style="display:none;position:absolute;top:0;z-index:5;pointer-events:none;background:#0f2a52;color:#fff;border-radius:10px;padding:7px 10px;font-size:10.5px;line-height:1.5;box-shadow:0 6px 18px rgba(0,0,0,.3);min-width:120px"></div></div><div style="font-size:9.5px;color:var(--muted);text-align:center;margin-top:2px">👆 Touch and slide on the chart to move the point</div>';
+}
+function vpCfBind(D,hl){
+  var svg=document.getElementById('vp-cf-svg'),G=window.__cfG,tip=document.getElementById('vp-cf-tip'),wrap=document.getElementById('vp-cf-wrap'),ov=document.getElementById('vp-cf-ov');
+  if(!svg||!G||!tip)return;
+  function show(i){
+    i=Math.max(0,Math.min(D.length-1,i));var d=D[i],x=G.X(i),yc=G.Y(d.cl),yn=G.Y(d.net);
+    ov.innerHTML='<line x1="'+x+'" x2="'+x+'" y1="'+G.pt+'" y2="'+(G.H-G.pb)+'" stroke="#d97706" stroke-width="1.2" stroke-dasharray="3 3"/>'+
+      '<circle cx="'+x+'" cy="'+yc+'" r="9" fill="#d97706" opacity=".18"/><circle cx="'+x+'" cy="'+yc+'" r="6" fill="#d97706" stroke="#fff" stroke-width="2.5"/>'+
+      '<circle cx="'+x+'" cy="'+yn+'" r="4" fill="'+(d.net>=0?'#16a34a':'#dc2626')+'" stroke="#fff" stroke-width="2"/>';
+    tip.innerHTML='<b style="font-size:11.5px">'+lbl(d.k)+'</b><br>B/F '+fmt(d.op)+'<br>Collected <span style="color:#86efac">'+fmt(d.c)+'</span><br>Spent <span style="color:#fca5a5">'+fmt(d.e)+'</span><br>Net <b style="color:'+(d.net>=0?'#86efac':'#fca5a5')+'">'+(d.net<0?'−':'+')+fmt(Math.abs(d.net))+'</b><br>C/F <b style="color:#fcd34d;font-size:12px">'+fmt(d.cl)+'</b>';
+    tip.style.display='block';
+    var wr=wrap.getBoundingClientRect(),px=x/G.W*wr.width,tw=tip.offsetWidth;
+    var left=px+12;if(left+tw>wr.width)left=px-tw-12;if(left<0)left=0;
+    tip.style.left=left+'px';
+    var cards=document.querySelectorAll('[data-cfk]');cards.forEach(function(c){var on=c.getAttribute('data-cfk')===d.k;c.style.outline=on?'2px solid #f59e0b':'none';});
+  }
+  function idx(ev){var r=svg.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*G.W;return Math.round((px-G.pl-G.bw/2)/G.bw);}
+  var drag=false;
+  svg.addEventListener('pointerdown',function(ev){drag=true;try{svg.setPointerCapture(ev.pointerId);}catch(e){}show(idx(ev));ev.preventDefault();});
+  svg.addEventListener('pointermove',function(ev){if(drag||ev.pointerType==='mouse')show(idx(ev));});
+  svg.addEventListener('pointerup',function(){drag=false;});
+  svg.addEventListener('pointercancel',function(){drag=false;});
+  var hi=D.findIndex(function(d){return d.k===hl;});show(hi>=0?hi:D.length-1);
 }
 function vpCfRender(){try{var dm=document.getElementById('dm'),b=document.getElementById('vp-cf-body');if(!dm||!b)return;var hl=dm.value,D=vpCfData(hl);if(!D.length){b.innerHTML='<div style="color:var(--muted);font-size:12px">No data yet.</div>';return;}
  var last=D[D.length-1],mxAbs=Math.max.apply(0,D.map(function(d){return Math.abs(d.net);}))||1,best=D.reduce(function(a,d){return d.net>a.net?d:a;}),worst=D.reduce(function(a,d){return d.net<a.net?d:a;});
@@ -12951,8 +12976,8 @@ function vpCfRender(){try{var dm=document.getElementById('dm'),b=document.getEle
  h+='<div style="margin-top:12px;font-size:11px;font-weight:700;color:var(--muted)">TREND · bars = month net · line = carry forward</div>'+vpCfChart(D,hl);
  h+='<div style="margin-top:6px;font-size:11px;font-weight:700;color:var(--muted)">MONTH BY MONTH</div><div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">';
  D.slice().reverse().forEach(function(d){var pos=d.net>=0,w=Math.round(Math.abs(d.net)/mxAbs*100),on=d.k===hl;
-  h+='<div style="border-radius:14px;padding:10px 12px;background:'+(on?'#fff8e6':'var(--card,#fff)')+';border:1.5px solid '+(on?'#f59e0b':'#e5e7eb')+';border-left:5px solid '+(pos?'#16a34a':'#dc2626')+'"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:13px">'+lbl(d.k)+'</b><span style="font-size:10px;font-weight:800;color:'+(pos?'#15803d':'#b91c1c')+';background:'+(pos?'#dcfce7':'#fee2e2')+';border-radius:12px;padding:2px 8px">'+(pos?'▲ +':'▼ −')+fmt(Math.abs(d.net))+'</span></div><div style="display:flex;align-items:center;gap:6px;margin:8px 0 6px;font-size:11px"><span style="color:#6b7280">B/F <b style="color:#111">'+fmt(d.op)+'</b></span><span style="flex:1;border-top:2px dashed #cbd5e1;position:relative"><span style="position:absolute;right:-2px;top:-9px;color:#94a3b8">▶</span></span><span style="color:#6b7280">C/F <b style="color:#b45309;font-size:13px">'+fmt(d.cl)+'</b></span></div><div style="height:6px;background:#eef2f7;border-radius:4px;overflow:hidden"><div style="width:'+w+'%;height:100%;border-radius:4px;background:'+(pos?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#fca5a5,#dc2626)')+'"></div></div><div style="display:flex;justify-content:space-between;font-size:9.5px;color:#6b7280;margin-top:4px"><span>Collected '+fmt(d.c)+'</span><span>Spent '+fmt(d.e)+'</span></div></div>';});
- b.innerHTML=h+'</div><p style="font-size:10px;color:var(--muted);margin-top:8px">C/F = B/F + collected − expenses; it becomes next month\'s B/F.</p>';}catch(e){}}
+  h+='<div data-cfk="'+d.k+'" style="border-radius:14px;padding:10px 12px;background:'+(on?'#fff8e6':'var(--card,#fff)')+';border:1.5px solid '+(on?'#f59e0b':'#e5e7eb')+';border-left:5px solid '+(pos?'#16a34a':'#dc2626')+'"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:13px">'+lbl(d.k)+'</b><span style="font-size:10px;font-weight:800;color:'+(pos?'#15803d':'#b91c1c')+';background:'+(pos?'#dcfce7':'#fee2e2')+';border-radius:12px;padding:2px 8px">'+(pos?'▲ +':'▼ −')+fmt(Math.abs(d.net))+'</span></div><div style="display:flex;align-items:center;gap:6px;margin:8px 0 6px;font-size:11px"><span style="color:#6b7280">B/F <b style="color:#111">'+fmt(d.op)+'</b></span><span style="flex:1;border-top:2px dashed #cbd5e1;position:relative"><span style="position:absolute;right:-2px;top:-9px;color:#94a3b8">▶</span></span><span style="color:#6b7280">C/F <b style="color:#b45309;font-size:13px">'+fmt(d.cl)+'</b></span></div><div style="height:6px;background:#eef2f7;border-radius:4px;overflow:hidden"><div style="width:'+w+'%;height:100%;border-radius:4px;background:'+(pos?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#fca5a5,#dc2626)')+'"></div></div><div style="display:flex;justify-content:space-between;font-size:9.5px;color:#6b7280;margin-top:4px"><span>Collected '+fmt(d.c)+'</span><span>Spent '+fmt(d.e)+'</span></div></div>';});
+ b.innerHTML=h+'</div><p style="font-size:10px;color:var(--muted);margin-top:8px">C/F = B/F + collected − expenses; it becomes next month\'s B/F.</p>';vpCfBind(D,hl);}catch(e){}}
 (function(){var o=window.rDash;if(typeof o==='function'){window.rDash=function(){var r=o.apply(this,arguments);vpCfRender();return r;};}})();
 function vpCfBreak(){
   var d0=document.getElementById('vp-cfb');if(d0)d0.remove();
