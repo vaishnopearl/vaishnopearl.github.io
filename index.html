@@ -7505,6 +7505,8 @@ function rFlats(){
         <button class="tbtn" style="background:#0369a1;color:#fff;border-color:#0369a1" onclick="prtIdCard('flat','${esc(f.name).replace(/'/g,"\\'")}','Flat ${f.no} · Owner','VP-FLAT-${f.no}')">🪪 ID Card</button>
         ${isAdmin?`<button class="tbtn" style="background:#0369a1;color:#fff;border-color:#0369a1" onclick="prtFlatInvoice('${f.no}','${k}')">🧾 Invoice</button>`:''}
         ${f.paid?`<button class="tbtn" style="background:var(--P);color:#fff;border-color:var(--P)" onclick="prtFlatReceipt('${f.no}','${k}')">🧾 Receipt</button>`:''}
+        ${(f.paid&&vpStampUrl(f))?`<button class="tbtn" onclick="vpOpenStamped('${k}','${f.no}')">📎 Verified Receipt</button>`:''}
+        ${(isAdmin&&f.paid&&vpStampUrl(f))?`<button class="tbtn" style="background:#16346B;color:#fff;border-color:#16346B" onclick="vpSendStamped('${f.no}','${k}')">📤 Send Image</button>`:''}
         ${f.paid?`<button class="tbtn" onclick="notifyPaymentSms('${f.no}','${k}')">💬 Notify SMS</button>`:''}
         ${f.paid?`<button class="tbtn" style="background:#25D366;color:#fff;border-color:#25D366" onclick="notifyPaymentWa('${f.no}','${k}')">📲 WhatsApp</button>`:''}
         ${(isAdmin&&f.paid)?`<button class="tbtn" style="background:#15803d;color:#fff;border-color:#15803d" onclick="sendReceiptToOwner('${f.no}','${k}','wa')">✅ WhatsApp Receipt</button>`:''}
@@ -7538,7 +7540,7 @@ function togF(k,i){
     md.flats[i].verifiedBy=(ROLES[currentRole]||{}).label||'Managing Committee';
     md.flats[i].verifiedAt=Date.now();
   }else{
-    delete md.flats[i].verifiedBy; delete md.flats[i].verifiedAt;delete md.flats[i].paymentMode;delete md.flats[i].paymentModeLabel;delete md.flats[i].paidMethod;delete md.flats[i].paidOn;delete md.flats[i].paidRef;delete md.flats[i].payEditedAt;delete md.flats[i].convenienceFee;delete md.flats[i].convenienceFeeGST;delete md.flats[i].amountReceived;
+    delete md.flats[i].verifiedBy; delete md.flats[i].verifiedAt;delete md.flats[i].paymentMode;delete md.flats[i].paymentModeLabel;delete md.flats[i].paidMethod;delete md.flats[i].paidOn;delete md.flats[i].paidRef;delete md.flats[i].payEditedAt;delete md.flats[i].verified;delete md.flats[i].proofUrl;delete md.flats[i].stampedUrl;delete md.flats[i].stampedData;delete md.flats[i].convenienceFee;delete md.flats[i].convenienceFeeGST;delete md.flats[i].amountReceived;
   }
   if(md.flats[i].paid&&!md.flats[i].paidOn){md.flats[i].paidOn=vpIsoToTs(vpTodayIso());md.flats[i].payEditedAt=Date.now();
   }
@@ -7546,7 +7548,7 @@ function togF(k,i){
   sv();rFlats();rDash();showToast(md.flats[i].paid?'✅ Marked Paid':'⚠️ Marked Pending');
 }
 function allPaid(){if(!canEdit())return;const k=document.getElementById('fm').value;const _who=(ROLES[currentRole]||{}).label||'Managing Committee';const _now=Date.now();gmd(k).flats.forEach(f=>{f.paid=true;f.verifiedBy=_who;f.verifiedAt=_now;if(!f.paidOn){f.paidOn=_now;f.payEditedAt=_now;}applyPenaltyOnPay(f,k);});sv();rFlats();rDash();showToast('✅ All Marked Paid');}
-function allPend(){if(!canEdit())return;const k=document.getElementById('fm').value;gmd(k).flats.forEach(f=>{f.paid=false;delete f.paymentMode;delete f.paymentModeLabel;delete f.paidMethod;delete f.paidOn;delete f.paidRef;delete f.payEditedAt;delete f.convenienceFee;delete f.convenienceFeeGST;delete f.amountReceived;applyPenaltyOnPay(f,k);});sv();rFlats();rDash();showToast('All Marked Pending');}
+function allPend(){if(!canEdit())return;const k=document.getElementById('fm').value;gmd(k).flats.forEach(f=>{f.paid=false;delete f.paymentMode;delete f.paymentModeLabel;delete f.paidMethod;delete f.paidOn;delete f.paidRef;delete f.payEditedAt;delete f.verified;delete f.proofUrl;delete f.stampedUrl;delete f.stampedData;delete f.convenienceFee;delete f.convenienceFeeGST;delete f.amountReceived;applyPenaltyOnPay(f,k);});sv();rFlats();rDash();showToast('All Marked Pending');}
 
 function openFlatEdit(no){
   if(!canEdit()){showToast('Board access only for your role');return;}
@@ -8803,7 +8805,7 @@ function sendReceiptToOwner(flatNo, k, channel){
     (fi.paidRef?('Txn Ref: '+fi.paidRef+'\n'):'')+
     (fi.verifiedBy?('Verified by: '+fi.verifiedBy+'\n'):'')+
     (fi.verifiedAt?('Verified on: '+ddmmyy_time(fi.verifiedAt)+'\n'):'')+
-    '\nYour receipt carries a VERIFIED stamp. Thank you.';
+    (vpStampUrl(fi)?('\n\n📎 Verified receipt image:\n'+(fi.stampedUrl||'(open the app → My Flat)')):'')+'\nYour receipt carries a VERIFIED stamp. Thank you.';
   var nums=[];
   if(flat.phone)nums.push(flat.phone);
   if(flat.tenantPhone)nums.push(flat.tenantPhone);
@@ -9420,6 +9422,7 @@ function rMyFlat(){
       ${paid?`<div class="sr"><span class="slb">Paid On</span><span style="font-weight:600">${esc(vpPayDate(fi)||'—')}</span></div>
       <div class="sr"><span class="slb">Payment Mode</span><span style="font-weight:600">${esc(vpPayMode(fi)||'—')}</span></div>
       ${vpPayRef(fi)?`<div class="sr"><span class="slb">Txn / UTR Ref.</span><span style="font-weight:600">${esc(vpPayRef(fi))}</span></div>`:''}`:''}
+      ${(paid&&vpStampUrl(fi))?`<button class="btn btn-p" style="margin-top:10px" onclick="vpOpenStamped('${k}','${ownerFlat}')">📎 View Verified Receipt (image)</button>`:''}
     </div>
     ${!paid?`<div class="card" style="border-color:var(--err);background:var(--errB)">
       <div style="font-size:12px;color:var(--err);font-weight:600">⚠️ Your maintenance for ${lbl(k)} is pending. Please pay and inform the Treasurer to update your status.</div>
@@ -11979,7 +11982,7 @@ function initOutstandingTab(){
 /* ===== WhatsApp / UPI receipt import (Share-to-app + manual picker) ===== */
 (function(){
 var SHARE_ROLES=['treasurer','secretary','gensec','vp','manasa'];
-var q=[],qi=0,curUrl=null,done=0,ocrToken=0,tessP=null,sentList=[];
+var q=[],qi=0,curUrl=null,done=0,ocrToken=0,tessP=null,sentList=[],busy=false;
 function $(id){return document.getElementById(id);}
 window.vpCanShare=function(){return !!isAdmin&&SHARE_ROLES.indexOf(currentRole)>=0;};
 var MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
@@ -12070,7 +12073,7 @@ function nrender(){
   $('vps-notify-list').innerHTML=sentList.map(function(x,i){
     var fl=FD.find(function(f){return f.no===x.no;})||{};var hasPh=!!(fl.phone||fl.tenantPhone);
     return '<div class="litem" style="gap:6px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">Flat '+esc(x.no)+' · '+esc(fl.name||'')+'</div><div style="font-size:10.5px;color:var(--muted)">'+esc(lbl(x.k))+(hasPh?'':' · no phone on file')+(x.sent?' · ✅ opened':'')+'</div></div>'
-      +(hasPh?'<button class="tbtn" style="background:#25D366;color:#fff;border-color:#25D366" onclick="vpShareNotify('+i+',\'wa\')">📲 WhatsApp</button><button class="tbtn" onclick="vpShareNotify('+i+',\'sms\')">💬 SMS</button>':'')+'</div>';
+      +(hasPh?'<button class="tbtn" style="background:#25D366;color:#fff;border-color:#25D366" onclick="vpShareNotify('+i+',\'wa\')">📲 WhatsApp</button><button class="tbtn" onclick="vpShareNotify('+i+',\'sms\')">💬 SMS</button>':'')+((x.blob||vpStampUrl((gmd(x.k).flats.find(function(ff){return ff.no===x.no;})||{})))?'<button class="tbtn" style="background:#16346B;color:#fff;border-color:#16346B" onclick="vpSendStamped(\''+x.no+'\',\''+x.k+'\')">📤 Receipt image</button>':'')+'</div>';
   }).join('');
 }
 window.vpShareNotifyOpen=function(){nrender();$('vps-notify').classList.remove('hidden');};
@@ -12084,6 +12087,7 @@ window.vpShareNotifyNext=function(){
   vpShareNotify(i,'wa');
 };
 window.vpShareConfirm=function(){
+  if(busy)return;
   if(!vpCanShare()){showToast('Not allowed for your role');return;}
   var no=$('vps-flat').value,k=$('vps-month').value,amt=parseFloat($('vps-amount').value),dt=$('vps-date').value||vpTodayIso(),ref=$('vps-ref').value.trim(),mode=$('vps-mode').value;
   if(!no){showToast('Select the flat');return;}
@@ -12099,6 +12103,7 @@ window.vpShareConfirm=function(){
   }
   if(amt!==st.mf&&!confirm('Amount ₹'+amt+' differs from the monthly maintenance ₹'+st.mf+'. Record this amount?'))return;
   var info=PAYMENT_MODE_FEES[mode]||{label:mode};
+  busy=true;
   f.paid=true;
   f.verifiedBy=(ROLES[currentRole]||{}).label||'Managing Committee';
   f.verifiedAt=Date.now();
@@ -12115,9 +12120,59 @@ window.vpShareConfirm=function(){
     broadcastPush('Payment Received — Flat '+no,fmt(amt)+' for '+lbl(k));
     vpUpdateBadge();
   }catch(e){}
-  sv();done++;sentList.push({no:no,k:k,sent:false});
+  sv();done++;var item={no:no,k:k,sent:false};sentList.push(item);
   try{rFlats();rDash();}catch(e){}
-  qi++;vpShareLoad();
+  var cur=q[qi];
+  $('vps-status').textContent='📎 Attaching receipt with Verified stamp…';
+  attach(f,no,k,cur,item).then(function(){busy=false;try{rFlats();}catch(e){}qi++;vpShareLoad();});
+};
+function stampBlob(blob,f,no,k){return new Promise(function(res,rej){
+  var url=URL.createObjectURL(blob),img=new Image();
+  img.onload=function(){try{
+    var W=Math.min(900,img.naturalWidth),sc=W/img.naturalWidth,H=Math.round(img.naturalHeight*sc),FH=240;
+    var c=document.createElement('canvas');c.width=W;c.height=H+FH;var x=c.getContext('2d');if(!x)throw new Error('no canvas');
+    x.fillStyle='#fff';x.fillRect(0,0,W,H+FH);x.drawImage(img,0,0,W,H);
+    
+    var y0=H;x.fillStyle='#f0fdf4';x.fillRect(0,y0,W,FH);x.fillStyle='#15803d';x.fillRect(0,y0,W,6);
+    x.save();x.translate(W-175,y0+138);x.rotate(-0.12);x.fillStyle='rgba(255,255,255,0.9)';x.fillRect(-140,-38,280,76);x.strokeStyle='#15803d';x.lineWidth=6;x.strokeRect(-140,-38,280,76);x.fillStyle='#15803d';x.font='900 44px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText('VERIFIED',0,0);x.restore();
+    x.textAlign='left';x.textBaseline='alphabetic';
+    x.font='900 34px Arial';x.fillText('✔ PAYMENT VERIFIED',24,y0+52);
+    x.fillStyle='#14532d';x.font='bold 21px Arial';
+    var ln=['Flat '+no+' · '+lbl(k)+' · '+fmt(f.amountReceived||st.mf),
+      'Paid on '+(vpPayDate(f)||'-')+' · '+(vpPayMode(f)||'-')+(f.paidRef?(' · Ref '+f.paidRef):''),
+      'Verified by '+(f.verifiedBy||'Board')+' · '+ddmmyy_time(f.verifiedAt),
+      'Receipt '+vpReceiptNo(no,k)+' · Code '+vpReceiptCode(no,k,f)];
+    ln.forEach(function(t,i){x.fillText(t.length>62?t.slice(0,60)+'…':t,24,y0+92+i*32);});
+    x.font='13px Arial';x.fillStyle='#166534';x.fillText('Vaishno Pearl FOMACS · ManasaTech Innovations',24,y0+FH-12);
+    c.toBlob(function(b){URL.revokeObjectURL(url);b?res(b):rej(new Error('blob'));},'image/jpeg',0.8);
+  }catch(e){rej(e);}};
+  img.onerror=function(){rej(new Error('image'));};img.src=url;
+});}
+async function attach(f,no,k,blob,item){
+  try{
+    var stamped=await stampBlob(blob,f,no,k);
+    item.blob=stamped;window.vpStampMem=window.vpStampMem||{};window.vpStampMem[no+'|'+k]=stamped;
+    var big=await vpStoreFile(blob,'proofs');if(big){f.proofUrl=big.url;f.proofPath=big.path;}
+    var sm=await vpStoreFile(new File([stamped],'verified-'+no+'-'+k+'.jpg',{type:'image/jpeg'}),'proofs');
+    if(sm){f.stampedUrl=sm.url;f.stampedPath=sm.path;}
+    else if(stamped.size<=180*1024){f.stampedData=await vpReadAsDataURL(stamped);}
+    else showToast('Receipt image kept on this phone only (cloud storage off)');
+    f.payEditedAt=Date.now();sv();
+  }catch(e){showToast('Marked paid, but the receipt image could not be attached');}
+}
+window.vpStampUrl=function(f){return (f&&(f.stampedUrl||f.stampedData))||'';};
+window.vpOpenStamped=function(k,no){var f=gmd(k).flats.find(function(x){return x.no===no;});var u=vpStampUrl(f);if(!u){showToast('No receipt image attached');return;}window.open(u,'_blank');};
+window.vpSendStamped=async function(no,k){
+  var f=gmd(k).flats.find(function(x){return x.no===no;});if(!f)return;
+  var blob=(window.vpStampMem||{})[no+'|'+k]||null;
+  try{if(!blob){var u=vpStampUrl(f);if(!u){showToast('No receipt image attached');return;}blob=await (await fetch(u)).blob();}}catch(e){}
+  var fl=FD.find(function(x){return x.no===no;})||{};
+  var text='✅ Payment verified — Flat '+no+' · '+lbl(k)+' · '+fmt(f.amountReceived||st.mf)+'. Your verified receipt is attached. — Vaishno Pearl FOMACS';
+  if(blob&&navigator.canShare&&navigator.share){
+    var file=new File([blob],'Verified-Receipt-Flat'+no+'-'+k+'.jpg',{type:'image/jpeg'});
+    if(navigator.canShare({files:[file]})){try{await navigator.share({files:[file],text:text,title:'Payment Verified'});return;}catch(e){if(e&&e.name==='AbortError')return;}}
+  }
+  sendReceiptToOwner(no,k,'wa');
 };
 async function vpShareCheckPending(){
   try{
