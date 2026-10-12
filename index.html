@@ -558,6 +558,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
 <!-- BOARD TABS -->
 <div class="tabbar hidden" id="board-tabs">
   <button class="tab on" onclick="goTab('dash',this)">📊 Dashboard</button>
+  <button class="tab" id="tab-smart" onclick="goTab('smart',this)">✨ Smart Hub</button>
   <button class="tab" onclick="goTab('flats',this)">🏠 Flats</button>
   <button class="tab" onclick="goTab('exp',this)">💸 Expenses</button>
   <button class="tab" onclick="goTab('calc',this)">🧮 Calc</button>
@@ -1120,6 +1121,60 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
   </div>
   <div class="sec">Meetings</div>
   <div id="meet-list"></div>
+</div>
+
+<!-- ═══════════ SMART HUB (board only) ═══════════ -->
+<div class="view hidden" id="v-smart">
+  <div class="sh-hero">
+    <div class="sh-hero-l">
+      <div class="sh-eyebrow">✨ SMART HUB</div>
+      <div class="sh-title" id="sh-hero-title">This month</div>
+      <div class="sh-sub" id="sh-hero-sub"></div>
+    </div>
+    <svg class="sh-ring" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" class="sh-ring-bg"/><circle cx="60" cy="60" r="50" class="sh-ring-fg" id="sh-ring-fg" transform="rotate(-90 60 60)"/><text x="60" y="66" text-anchor="middle" class="sh-ring-tx" id="sh-ring-tx">0%</text></svg>
+  </div>
+
+  <div class="sh-kpis" id="sh-kpis"></div>
+
+  <div class="card sh-card">
+    <div class="ctitle">📈 Collection vs Expenses · last 12 months</div>
+    <div id="sh-bars"></div>
+    <div class="sh-legend"><span><i style="background:var(--ok)"></i>Collected</span><span><i style="background:var(--err)"></i>Expenses</span></div>
+    <div class="sh-forecast" id="sh-forecast"></div>
+  </div>
+
+  <div class="card sh-card">
+    <div class="ctitle">🔥 Payment Heatmap · who pays on time</div>
+    <div id="sh-heat" class="sh-heat-wrap"></div>
+    <div class="sh-legend"><span><i style="background:var(--ok)"></i>Paid</span><span><i style="background:var(--err)"></i>Unpaid</span><span><i style="background:var(--bdr)"></i>No record</span></div>
+  </div>
+
+  <div class="card sh-card">
+    <div class="ctitle">🔔 Auto Reminders</div>
+    <div class="sh-tier" id="sh-tier"></div>
+    <div id="sh-rem-list"></div>
+    <div class="row2" style="margin-top:10px">
+      <button class="btn btn-wa" style="flex:1" onclick="vpSmartRemAll()">📲 Send one by one</button>
+    </div>
+    <div id="sh-rem-prog" class="sh-prog hidden"></div>
+  </div>
+
+  <div class="card sh-card">
+    <div class="ctitle">📲 Owner Pay QR</div>
+    <div class="fg"><label class="fl">Flat</label><select id="sh-qr-flat" onchange="vpSmartQr()"></select></div>
+    <div id="sh-qr-box"></div>
+  </div>
+
+  <div class="card sh-card">
+    <div class="ctitle">💬 Complaints &amp; Smart Summary</div>
+    <div class="sh-kpis sh-kpis3" id="sh-cmp"></div>
+    <div class="fg" style="margin-top:10px"><label class="fl">Summary month</label><select id="sh-sum-month" onchange="vpSmartSummary()"></select></div>
+    <pre class="sh-sum" id="sh-sum"></pre>
+    <div class="row2">
+      <button class="btn btn-o" style="flex:1" onclick="vpSmartCopySum()">📋 Copy</button>
+      <button class="btn btn-wa" style="flex:1" onclick="vpSmartShareSum()">📲 Share</button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════ QUERIES (board + owner) ═══════════ -->
@@ -7325,6 +7380,7 @@ function goTab(id,btn){
   else if(id==='myflat')rMyFlat();
   else if(id==='contacts')rContacts();
   else if(id==='reminders')rReminders();
+  else if(id==='smart'){try{vpSmartRender();}catch(e){console.error(e);}}
   else if(id==='queries')rQueries();
   else if(id==='calc')calcInit();
   else if(id==='visitors')rVisitors();
@@ -9352,9 +9408,10 @@ function renderPayQR(){
   if(!isAdmin&&ownerFlat){
     var _k=curKey();var _md=gmd(_k);var _fl=_md.flats.find(function(f){return f.no===ownerFlat;});
     if(_fl&&!_fl.paid){
-      amtParam='&am='+encodeURIComponent(st.mf);
+      var _pp=calcPenalty(vpFlatAmt(_fl),new Date()),_amt=_pp.total;
+      amtParam='&am='+encodeURIComponent(_amt);
       noteParam='Flat '+ownerFlat+' Maintenance '+lbl(_k);
-      dueLine='<div style="font-size:12px;margin-bottom:8px">Amount pre-filled: <b style="color:var(--ok)">'+fmt(st.mf)+'</b> for Flat <b>'+esc(ownerFlat)+'</b>, '+esc(lbl(_k))+'</div>';
+      dueLine='<div style="font-size:12px;margin-bottom:8px">Amount pre-filled: <b style="color:var(--ok)">'+fmt(_amt)+'</b>'+(_pp.tier>0?' <span style="color:#a11">(incl. '+_pp.penaltyPct+'% late penalty)</span>':'')+' for Flat <b>'+esc(ownerFlat)+'</b>, '+esc(lbl(_k))+'</div>';
     }
   }
   var upiUrl='upi://pay?pa='+upi+'&pn='+encodeURIComponent(pn)+amtParam+'&tn='+encodeURIComponent(noteParam)+'&cu=INR';
@@ -12445,5 +12502,231 @@ window.vpDataCtlInit=function(){var c=$('datactl-card');if(c){c.classList.toggle
 (function(){function add(){var a=document.getElementById('app');if(!a||document.getElementById('vp-logout-bar'))return;
 var d=document.createElement('div');d.id='vp-logout-bar';d.innerHTML='<button type="button" onclick="logoutConfirm()">⏻ Logout</button>';a.appendChild(d);}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add);else add();})();
+</script>
+<style id="vp-modern">
+/* ===== v62 Modern look ===== */
+body{background:radial-gradient(1200px 500px at 85% -10%,rgba(35,74,131,.10),transparent 60%),radial-gradient(900px 400px at -10% 10%,rgba(169,120,26,.07),transparent 55%),var(--surf)}
+.view.on{animation:vpIn .32s cubic-bezier(.2,.8,.2,1)}
+@keyframes vpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card{border-radius:20px;border-color:color-mix(in srgb,var(--bdr) 70%,transparent);background:linear-gradient(180deg,var(--white),color-mix(in srgb,var(--white) 94%,var(--PL)));transition:transform .18s,box-shadow .18s}
+.card:active{transform:scale(.995)}
+.met{border-radius:20px;background:linear-gradient(145deg,var(--white),color-mix(in srgb,var(--white) 88%,var(--mbg)))}
+.topbar{background:linear-gradient(135deg,#234a83 0%,#13294e 70%,#0e1f3c 100%);backdrop-filter:saturate(1.4)}
+.tab{border-radius:999px;border-bottom:none;margin:6px 3px;padding:8px 14px;transition:background .15s,color .15s}
+.tab.on{background:var(--grad);color:#fff;border-bottom:none;box-shadow:0 4px 12px rgba(27,58,102,.3)}
+.btn{border-radius:14px;transition:transform .12s,box-shadow .12s}
+.btn:active{transform:scale(.98)}
+.chip{border-radius:999px}
+@media (prefers-reduced-motion:reduce){.view.on{animation:none}*{transition:none!important}}
+/* Smart Hub */
+.sh-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 18px;margin-bottom:12px;border-radius:24px;color:#fff;background:linear-gradient(135deg,#234a83,#13294e 65%,#7a5410);box-shadow:0 10px 30px rgba(19,41,78,.35);position:relative;overflow:hidden}
+.sh-hero:after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.18),transparent 70%)}
+.sh-eyebrow{font-size:10px;letter-spacing:.18em;font-weight:800;opacity:.75}
+.sh-title{font-size:22px;font-weight:900;margin-top:2px}
+.sh-sub{font-size:12px;opacity:.85;margin-top:4px;line-height:1.4}
+.sh-ring{width:96px;height:96px;flex-shrink:0;position:relative;z-index:1}
+.sh-ring-bg{fill:none;stroke:rgba(255,255,255,.2);stroke-width:12}
+.sh-ring-fg{fill:none;stroke:#fbbf24;stroke-width:12;stroke-linecap:round;stroke-dasharray:314;stroke-dashoffset:314;transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)}
+.sh-ring-tx{fill:#fff;font-size:26px;font-weight:900}
+.sh-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.sh-kpis3{grid-template-columns:repeat(3,1fr);margin-bottom:0}
+.sh-kpi{border-radius:18px;padding:12px 14px;background:var(--white);border:1px solid var(--bdr);box-shadow:var(--sh)}
+.sh-kpi b{display:block;font-size:19px;font-weight:900;color:var(--P)}
+.sh-kpi span{font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.02em}
+.sh-kpi.ok b{color:var(--ok)}.sh-kpi.err b{color:var(--err)}.sh-kpi.warn b{color:var(--warn)}
+.sh-card .ctitle{margin-bottom:10px}
+.sh-bars svg{width:100%;height:auto;display:block}
+.sh-legend{display:flex;gap:14px;font-size:11px;color:var(--muted);font-weight:600;margin-top:6px;flex-wrap:wrap}
+.sh-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.sh-forecast{margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--PL);font-size:12px;color:var(--txt);line-height:1.5}
+.sh-heat-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.sh-heat{border-collapse:separate;border-spacing:3px;font-size:9px;color:var(--muted)}
+.sh-heat td,.sh-heat th{padding:0;text-align:center;font-weight:700}
+.sh-heat th{font-size:8.5px;padding-bottom:2px}
+.sh-heat td.f{padding-right:6px;text-align:right;font-size:10px;color:var(--txt)}
+.sh-cell{display:block;width:17px;height:17px;border-radius:5px;background:var(--bdr)}
+.sh-cell.p{background:var(--ok)}.sh-cell.u{background:var(--err)}.sh-cell.l{background:#d97706}
+.sh-tier{padding:10px 12px;border-radius:14px;font-size:12px;font-weight:700;margin-bottom:10px;line-height:1.45}
+.sh-tier.t0{background:var(--okB);color:var(--ok)}.sh-tier.t1{background:var(--warnB);color:var(--warn)}.sh-tier.t2{background:var(--errB);color:var(--err)}
+.sh-rem{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr)}
+.sh-rem:last-child{border-bottom:none}
+.sh-rem .n{flex:1;min-width:0}.sh-rem .n b{display:block;font-size:13px}.sh-rem .n span{font-size:11px;color:var(--muted)}
+.sh-rem .a{font-weight:800;font-size:13px;color:var(--err);white-space:nowrap}
+.sh-prog{margin-top:8px;font-size:12px;font-weight:700;color:var(--P)}
+.sh-qr{text-align:center}
+.sh-qr .q{display:inline-block;padding:12px;border-radius:18px;background:#fff;border:1px solid var(--bdr);box-shadow:var(--sh)}
+.sh-qr .q svg,.sh-qr .q img{width:210px;height:210px;display:block}
+.sh-sum{white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:12.5px;line-height:1.55;background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:12px;margin:10px 0;max-height:360px;overflow:auto}
+</style>
+<script>
+/* ===== v62 Smart Hub: charts, heatmap, auto reminders, owner QR, smart summary ===== */
+(function(){
+function $(i){return document.getElementById(i);}
+function E(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function monthsBack(n){var c=curKey(),o=[];for(var i=n-1;i>=0;i--)o.push(mkAdd(c,-i));return o;}
+function expOf(md){return ((md&&md.expenses)||[]).reduce(function(a,e){return a+(+e.amount||0);},0);}
+function flatIn(md,no,idx){var fl=(md&&md.flats)||[];return fl.find(function(x){return x&&String(x.no)===String(no);})||fl[idx];}
+function short(k){return ML[+k.split('-')[1]-1].slice(0,3);}
+function waNum(p){var d=String(p||'').replace(/\D/g,'');if(d.length===10)d='91'+d;return d;}
+function inr(n){n=Math.round(n||0);return (n<0?'-':'')+'₹'+Math.abs(n).toLocaleString('en-IN');}
+
+function hero(){
+  var k=curKey(),md=st.months[k];
+  var coll=md?vpColl(md):0,exp=md?expOf(md):0;
+  var tot=FD.length,paid=md?(md.flats||[]).filter(function(f){return f.paid;}).length:0;
+  var exp_=md?(md.flats||[]).reduce(function(a,f){return a+vpFlatAmt(f);},0):0;
+  var pct=exp_?Math.round(coll*100/exp_):0;
+  $('sh-hero-title').textContent=lbl(k);
+  $('sh-hero-sub').innerHTML=paid+' of '+tot+' flats paid<br>'+inr(coll)+' collected of '+inr(exp_);
+  var fg=$('sh-ring-fg');if(fg){fg.style.strokeDashoffset=String(314-314*Math.min(100,pct)/100);}
+  $('sh-ring-tx').textContent=pct+'%';
+  var bal=0;try{bal=calcCF(k);}catch(e){}
+  $('sh-kpis').innerHTML=
+    '<div class="sh-kpi ok"><b>'+inr(coll)+'</b><span>COLLECTED</span></div>'+
+    '<div class="sh-kpi err"><b>'+inr(exp)+'</b><span>EXPENSES</span></div>'+
+    '<div class="sh-kpi warn"><b>'+(tot-paid)+'</b><span>PENDING FLATS</span></div>'+
+    '<div class="sh-kpi"><b>'+inr(bal)+'</b><span>BALANCE (CARRIED)</span></div>';
+}
+function bars(){
+  var ks=monthsBack(12),data=ks.map(function(k){var md=st.months[k];return {k:k,c:md?vpColl(md):0,e:md?expOf(md):0,has:!!md};});
+  var mx=Math.max.apply(null,data.map(function(d){return Math.max(d.c,d.e);}).concat([1]));
+  var W=360,H=170,pb=22,pt=8,bw=10,gap=(W-12*2*bw)/13,svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Collection versus expenses, last 12 months">';
+  [0.25,0.5,0.75,1].forEach(function(f){var y=pt+(H-pb-pt)*(1-f);svg+='<line x1="0" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="var(--bdr)" stroke-width="1"/>';});
+  data.forEach(function(d,i){
+    var x=gap+i*(2*bw+gap),ch=(H-pb-pt)*d.c/mx,eh=(H-pb-pt)*d.e/mx;
+    svg+='<rect x="'+x+'" y="'+(H-pb-ch)+'" width="'+bw+'" height="'+Math.max(ch,d.c?2:0)+'" rx="3" fill="var(--ok)"><title>'+lbl(d.k)+' collected '+inr(d.c)+'</title></rect>';
+    svg+='<rect x="'+(x+bw)+'" y="'+(H-pb-eh)+'" width="'+bw+'" height="'+Math.max(eh,d.e?2:0)+'" rx="3" fill="var(--err)"><title>'+lbl(d.k)+' expenses '+inr(d.e)+'</title></rect>';
+    svg+='<text x="'+(x+bw)+'" y="'+(H-6)+'" text-anchor="middle" font-size="8.5" fill="var(--muted)" font-weight="700">'+short(d.k)+'</text>';
+  });
+  svg+='</svg>';$('sh-bars').className='sh-bars';$('sh-bars').innerHTML=svg;
+  // forecast: average of last 3 recorded months
+  var rec=data.filter(function(d){return d.has&&d.k<curKey()&&(d.c||d.e);}).slice(-3);
+  var fc=$('sh-forecast');
+  if(rec.length<2){fc.innerHTML='🔮 <b>Forecast</b> needs at least 2 completed months of data.';return;}
+  var ac=rec.reduce(function(a,d){return a+d.c;},0)/rec.length,ae=rec.reduce(function(a,d){return a+d.e;},0)/rec.length;
+  var nk=mkAdd(curKey(),1),net=ac-ae;
+  fc.innerHTML='🔮 <b>Forecast for '+lbl(nk)+'</b> (avg of last '+rec.length+' months)<br>Expected collection <b>'+inr(ac)+'</b> · expenses <b>'+inr(ae)+'</b> · '+(net>=0?'surplus':'shortfall')+' <b style="color:'+(net>=0?'var(--ok)':'var(--err)')+'">'+inr(Math.abs(net))+'</b>';
+}
+function heat(){
+  var ks=monthsBack(12),h='<table class="sh-heat"><tr><th></th>'+ks.map(function(k){return '<th>'+short(k)+'</th>';}).join('')+'</tr>';
+  FD.forEach(function(f,i){
+    h+='<tr><td class="f">'+E(f.no)+'</td>'+ks.map(function(k){
+      var fl=flatIn(st.months[k],f.no,i),c='';
+      if(fl){c=fl.paid?(fl.penaltyApplied?'l':'p'):'u';}
+      return '<td><span class="sh-cell '+c+'" title="Flat '+E(f.no)+' · '+lbl(k)+(fl?(fl.paid?' · paid'+(fl.penaltyApplied?' late':''):' · unpaid'):' · no record')+'"></span></td>';
+    }).join('')+'</tr>';
+  });
+  h+='</table>';$('sh-heat').innerHTML=h;
+}
+function curDue(){
+  var k=curKey(),md=st.months[k]||{flats:[]},out=[];
+  FD.forEach(function(f,i){var fl=flatIn(md,f.no,i);if(fl&&!fl.paid){var p=calcPenalty(vpFlatAmt(fl),new Date());out.push({f:f,fl:fl,pen:p,amt:p.total});}});
+  return out;
+}
+function tier(){
+  var d=new Date().getDate(),el=$('sh-tier');
+  var t=d<5?['t0','🗓️ Reminders start on the 5th. Due date is the '+DUE_DAY+'th.']:d<=DUE_DAY?['t0','🔔 Friendly reminder window (5th–'+DUE_DAY+'th). No penalty yet.']:d<=PENALTY_TIER1_END_DAY?['t1','⚠️ Late window (11th–20th): 10% penalty applies.']:['t2','🚫 21st onward: 20% penalty and services can be stopped.'];
+  el.className='sh-tier '+t[0];el.textContent=t[1];
+}
+function msg(it){
+  var k=curKey(),p=it.pen,d=new Date().getDate();
+  var m='🏢 *Vaishno Pearl FOMACS* – Maintenance Reminder\nFlat '+it.f.no+' · '+lbl(k)+'\nMaintenance: '+inr(vpFlatAmt(it.fl));
+  if(p.tier>0)m+='\nLate penalty ('+p.penaltyPct+'%): '+inr(p.penaltyAmt)+'\n*Total payable: '+inr(p.total)+'*';
+  else m+='\nDue by the '+DUE_DAY+'th of the month.';
+  if(p.serviceStopped)m+='\n🚫 Services to the flat can be stopped until payment is cleared.';
+  if(st.upiId)m+='\n\nPay via UPI: '+st.upiId;
+  m+='\nAfter paying, share the receipt screenshot with the Treasurer. Thank you!';
+  return m;
+}
+var remQ=[],remI=0;
+function remList(){
+  var due=curDue(),box=$('sh-rem-list');
+  if(!due.length){box.innerHTML='<div style="text-align:center;padding:14px;color:var(--ok);font-weight:800">🎉 All flats have paid this month</div>';return;}
+  box.innerHTML=due.map(function(it,i){return '<div class="sh-rem"><div class="n"><b>Flat '+E(it.f.no)+' · '+E(it.f.name||'')+'</b><span>'+(it.pen.tier>0?'incl. '+it.pen.penaltyPct+'% penalty':'on time so far')+'</span></div><div class="a">'+inr(it.amt)+'</div><button class="btn btn-wa btn-s" style="width:auto;padding:7px 12px" onclick="vpSmartRem('+i+')">📲</button></div>';}).join('');
+}
+function openWa(it){
+  var n=waNum(it.f.phone);
+  if(!n){showToast('No phone number for Flat '+it.f.no);return false;}
+  window.open('https://wa.me/'+n+'?text='+encodeURIComponent(msg(it)),'_blank');return true;
+}
+window.vpSmartRem=function(i){if(!canEdit()){showToast('Board access only');return;}var it=curDue()[i];if(it)openWa(it);};
+window.vpSmartRemAll=function(){
+  if(!canEdit()){showToast('Board access only');return;}
+  remQ=curDue();remI=0;var pr=$('sh-rem-prog');
+  if(!remQ.length){showToast('No pending flats');return;}
+  pr.classList.remove('hidden');step();
+  function step(){
+    if(remI>=remQ.length){pr.innerHTML='✅ Done — reminders opened for '+remQ.length+' flat(s)';return;}
+    var it=remQ[remI];
+    pr.innerHTML='Flat '+E(it.f.no)+' ('+(remI+1)+'/'+remQ.length+') <button class="btn btn-wa btn-s" style="width:auto;display:inline-block;padding:6px 14px;margin-left:8px" id="sh-next">Open WhatsApp ▶</button> <button class="btn btn-o btn-s" style="width:auto;display:inline-block;padding:6px 12px" id="sh-skip">Skip</button>';
+    $('sh-next').onclick=function(){openWa(it);remI++;step();};
+    $('sh-skip').onclick=function(){remI++;step();};
+  }
+};
+// ---- QR ----
+var qrP=null;
+function loadQr(){if(window.qrcode)return Promise.resolve(true);if(qrP)return qrP;
+  qrP=new Promise(function(res){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';s.onload=function(){res(!!window.qrcode);};s.onerror=function(){qrP=null;res(false);};document.head.appendChild(s);});return qrP;}
+function qrFill(){
+  var sel=$('sh-qr-flat');if(!sel||sel.options.length)return;
+  sel.innerHTML=FD.map(function(f,i){return '<option value="'+i+'">Flat '+E(f.no)+' – '+E(f.name||'')+'</option>';}).join('');
+}
+window.vpSmartQr=async function(){
+  qrFill();var box=$('sh-qr-box'),upi=(st.upiId||'').trim();
+  if(!upi){box.innerHTML='<div style="font-size:12px;color:var(--muted)">Set the society UPI ID first (Contacts tab → Maintenance Payment).</div>';return;}
+  var i=+$('sh-qr-flat').value||0,f=FD[i],k=curKey(),fl=flatIn(st.months[k],f.no,i);
+  var base=vpFlatAmt(fl||{}),p=calcPenalty(base,new Date()),paid=fl&&fl.paid,amt=paid?0:p.total;
+  var note='Flat '+f.no+' Maintenance '+lbl(k);
+  var url='upi://pay?pa='+upi+'&pn='+encodeURIComponent('Vaishno Pearl FOMACS')+(amt?'&am='+amt:'')+'&tn='+encodeURIComponent(note)+'&cu=INR';
+  var ok=await loadQr(),img='';
+  if(ok){try{var q=window.qrcode(0,'M');q.addData(url);q.make();img=q.createSvgTag({cellSize:4,margin:0,scalable:true});}catch(e){img='';}}
+  if(!img)img='<img alt="UPI QR" src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&data='+encodeURIComponent(url)+'" onerror="this.outerHTML=\'<div style=&quot;width:210px;padding:40px 10px;font-size:12px;color:#5b6b82&quot;>QR needs internet once.<br>Use <b>Pay here</b> or the UPI ID.</div>\'"/>';
+  box.innerHTML='<div class="sh-qr"><div class="q">'+img+'</div><div style="margin-top:8px;font-weight:800;font-size:15px">'+(paid?'✅ Already paid':inr(amt))+'</div><div style="font-size:11px;color:var(--muted)">'+E(note)+(p.tier>0&&!paid?' · incl. '+p.penaltyPct+'% penalty':'')+'</div>'+
+    '<div class="row2" style="margin-top:10px"><button class="btn btn-wa" style="flex:1" id="sh-qr-send">📲 Send to owner</button><a class="btn btn-p" style="flex:1;text-align:center;text-decoration:none" href="'+url.replace(/&/g,'&amp;')+'">Pay here</a></div></div>';
+  $('sh-qr-send').onclick=function(){
+    var n=waNum(f.phone);if(!n){showToast('No phone number');return;}
+    var t='🏢 Vaishno Pearl FOMACS\nFlat '+f.no+' · '+lbl(k)+'\n'+(paid?'Payment received. Thank you!':'Amount: '+inr(amt)+'\nPay by tapping this UPI link:\n'+url+'\n\nOr pay to UPI ID: '+upi);
+    window.open('https://wa.me/'+n+'?text='+encodeURIComponent(t),'_blank');};
+};
+// ---- complaints + summary ----
+function cmp(){
+  var q=st.queries||[],n=function(s){return q.filter(function(x){return x.status===s;}).length;};
+  var open=n('Open'),proc=n('Under Process'),res=n('Resolved')+n('Closed');
+  $('sh-cmp').innerHTML='<div class="sh-kpi warn"><b>'+open+'</b><span>OPEN</span></div><div class="sh-kpi"><b>'+proc+'</b><span>IN PROCESS</span></div><div class="sh-kpi ok"><b>'+res+'</b><span>RESOLVED</span></div>';
+}
+function sumMonths(){
+  var sel=$('sh-sum-month');if(!sel)return;var prev=sel.value;
+  var ks=Object.keys(st.months).filter(function(k){return /^\d{4}-\d{2}$/.test(k)&&k<=curKey();}).sort().reverse();
+  sel.innerHTML=ks.map(function(k){return '<option value="'+k+'">'+lbl(k)+'</option>';}).join('');
+  sel.value=(prev&&ks.indexOf(prev)>=0)?prev:curKey();
+}
+window.vpSmartSummary=function(){
+  var k=($('sh-sum-month')||{}).value||curKey(),md=st.months[k];if(!md){$('sh-sum').textContent='No data for this month.';return;}
+  var coll=vpColl(md),exp=expOf(md),exp_=(md.flats||[]).reduce(function(a,f){return a+vpFlatAmt(f);},0),pct=exp_?Math.round(coll*100/exp_):0;
+  var paid=(md.flats||[]).filter(function(f){return f.paid;}),unp=(md.flats||[]).filter(function(f){return !f.paid;});
+  var late=paid.filter(function(f){return f.penaltyApplied;});
+  var cats={};(md.expenses||[]).forEach(function(e){var c=String(e.cat||e.label||'Other').replace(/^[^\w]+/,'');cats[c]=(cats[c]||0)+(+e.amount||0);});
+  var top=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).slice(0,3);
+  var bal=0;try{bal=calcCF(k);}catch(e){}
+  var q=st.queries||[],inM=q.filter(function(x){var d=new Date(x.createdAt||0);return mk(d.getFullYear(),d.getMonth()+1)===k;});
+  var t='📊 *Vaishno Pearl FOMACS – '+lbl(k)+' Summary*\n\n';
+  t+='💰 Collected: '+inr(coll)+' of '+inr(exp_)+' ('+pct+'%)\n';
+  t+='✅ Paid: '+paid.length+' flats'+(late.length?' ('+late.length+' late)':'')+'\n';
+  t+='⏳ Pending: '+unp.length+' flats'+(unp.length?' – '+unp.map(function(f){return f.no;}).join(', '):'')+'\n';
+  t+='📉 Expenses: '+inr(exp)+(top.length?'\n   Top: '+top.map(function(c){return c+' '+inr(cats[c]);}).join(' · '):'')+'\n';
+  t+='🏦 Balance carried: '+inr(bal)+'\n';
+  t+='💬 Queries this month: '+inM.length+' ('+inM.filter(function(x){return x.status==='Open';}).length+' open)\n\n';
+  var insight=pct>=95?'Excellent collection this month.':pct>=75?'Good collection; follow up with the pending flats.':'Collection is low; send reminders to the pending flats.';
+  if(exp>coll)insight+=' Expenses exceeded collection by '+inr(exp-coll)+'.';
+  t+='🧠 Insight: '+insight+'\n\n— Managing Committee';
+  $('sh-sum').textContent=t;
+};
+window.vpSmartCopySum=function(){var t=$('sh-sum').textContent;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){showToast('Summary copied');},function(){showToast('Copy failed');});else showToast('Copy not supported');};
+window.vpSmartShareSum=function(){var t=$('sh-sum').textContent;if(navigator.share){navigator.share({text:t}).catch(function(){});}else window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');};
+window.vpSmartRender=function(){
+  if(!isAdmin)return;
+  hero();bars();heat();tier();remList();cmp();sumMonths();vpSmartSummary();qrFill();vpSmartQr();
+};
+})();
 </script>
 </body></html>
