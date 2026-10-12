@@ -2520,10 +2520,22 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div class="fg"><label class="fl">Payment Date</label><input type="date" id="vps-date"/></div>
     <div class="fg"><label class="fl">Paid Via</label><select id="vps-mode"></select></div>
     <div class="fg"><label class="fl">UPI Ref / Txn ID</label><input type="text" id="vps-ref" placeholder="e.g. 412345678901"/></div>
+    <div style="font-size:10.5px;color:var(--muted);margin:2px 0 8px">Marking paid also stamps the payment <b>Verified</b> and posts a “Payment Received” notice. After the last receipt you can send each owner their verified message.</div>
     <div class="row2">
       <button class="btn btn-p btn-s" onclick="vpShareConfirm()">✅ Mark Paid &amp; Next</button>
       <button class="btn btn-o btn-s" style="color:var(--P)" onclick="vpShareSkip()">Skip</button>
       <button class="btn btn-o btn-s" style="color:var(--P)" onclick="vpShareClose()">Close</button>
+    </div>
+  </div>
+</div>
+<div class="vmodal hidden" id="vps-notify">
+  <div class="vcard">
+    <div class="ctitle">📨 Send “Payment Verified” to owners</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Tap an owner’s button — WhatsApp or SMS opens with their verified receipt message ready to send.</p>
+    <div id="vps-notify-list"></div>
+    <div class="row2" style="margin-top:10px">
+      <button class="btn btn-p btn-s" onclick="vpShareNotifyNext()">Next owner →</button>
+      <button class="btn btn-o btn-s" style="color:var(--P)" onclick="document.getElementById('vps-notify').classList.add('hidden')">Done</button>
     </div>
   </div>
 </div>
@@ -11967,7 +11979,7 @@ function initOutstandingTab(){
 /* ===== WhatsApp / UPI receipt import (Share-to-app + manual picker) ===== */
 (function(){
 var SHARE_ROLES=['treasurer','secretary','gensec','vp','manasa'];
-var q=[],qi=0,curUrl=null,done=0,ocrToken=0,tessP=null;
+var q=[],qi=0,curUrl=null,done=0,ocrToken=0,tessP=null,sentList=[];
 function $(id){return document.getElementById(id);}
 window.vpCanShare=function(){return !!isAdmin&&SHARE_ROLES.indexOf(currentRole)>=0;};
 var MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
@@ -12009,7 +12021,7 @@ window.vpSharePick=function(){
 window.vpShareFromPicker=function(inp){var fs=Array.prototype.slice.call(inp.files||[]);if(fs.length)vpShareOpen(fs);};
 window.vpShareOpen=function(files){
   if(!vpCanShare()){showToast('Only Treasurer, Secretary, General Secretary or Vice President can record receipts');return;}
-  q=files;qi=0;done=0;
+  q=files;qi=0;done=0;sentList=[];
   var ks=allKeys().filter(function(k){return st.months[k];}).sort().reverse();
   $('vps-month').innerHTML=ks.map(function(k){return '<option value="'+k+'">'+esc(lbl(k))+'</option>';}).join('');
   $('vps-flat').innerHTML='<option value="">— select flat —</option>'+FD.map(function(f){return '<option value="'+esc(f.no)+'">Flat '+esc(f.no)+' · '+esc(f.name||'')+'</option>';}).join('');
@@ -12050,8 +12062,26 @@ window.vpShareSkip=function(){qi++;vpShareLoad();};
 window.vpShareClose=function(finished){
   ocrToken++;$('vps-modal').classList.add('hidden');
   if(curUrl){try{URL.revokeObjectURL(curUrl);}catch(e){}curUrl=null;}
-  if(finished||done)showToast('✅ '+done+' payment'+(done===1?'':'s')+' recorded from receipts');
+  if(finished||done)showToast('✅ '+done+' payment'+(done===1?'':'s')+' recorded and verified');
   q=[];qi=0;
+  if(sentList.length)vpShareNotifyOpen();
+};
+function nrender(){
+  $('vps-notify-list').innerHTML=sentList.map(function(x,i){
+    var fl=FD.find(function(f){return f.no===x.no;})||{};var hasPh=!!(fl.phone||fl.tenantPhone);
+    return '<div class="litem" style="gap:6px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">Flat '+esc(x.no)+' · '+esc(fl.name||'')+'</div><div style="font-size:10.5px;color:var(--muted)">'+esc(lbl(x.k))+(hasPh?'':' · no phone on file')+(x.sent?' · ✅ opened':'')+'</div></div>'
+      +(hasPh?'<button class="tbtn" style="background:#25D366;color:#fff;border-color:#25D366" onclick="vpShareNotify('+i+',\'wa\')">📲 WhatsApp</button><button class="tbtn" onclick="vpShareNotify('+i+',\'sms\')">💬 SMS</button>':'')+'</div>';
+  }).join('');
+}
+window.vpShareNotifyOpen=function(){nrender();$('vps-notify').classList.remove('hidden');};
+window.vpShareNotify=function(i,ch){
+  var x=sentList[i];if(!x)return;
+  try{sendReceiptToOwner(x.no,x.k,ch);x.sent=true;nrender();}catch(e){showToast('Could not open the message');}
+};
+window.vpShareNotifyNext=function(){
+  var i=sentList.findIndex(function(x){var fl=FD.find(function(f){return f.no===x.no;})||{};return !x.sent&&(fl.phone||fl.tenantPhone);});
+  if(i<0){showToast('All owners done');return;}
+  vpShareNotify(i,'wa');
 };
 window.vpShareConfirm=function(){
   if(!vpCanShare()){showToast('Not allowed for your role');return;}
@@ -12078,7 +12108,14 @@ window.vpShareConfirm=function(){
   delete f.convenienceFee;delete f.convenienceFeeGST;
   applyPenaltyOnPay(f,k);
   try{logAudit('payment',f.verifiedBy,'Flat '+no+' · '+lbl(k)+' · ₹'+amt+' via '+info.label+' (WhatsApp receipt)'+(ref?' · Ref '+ref:''));}catch(e){}
-  sv();done++;
+  f.verified=true;
+  try{
+    st.notices=st.notices||[];
+    st.notices.unshift({id:uid(),title:'✅ Payment Received: Flat '+no,date:Util_today(),body:fmt(amt)+' received from Flat '+no+' for '+lbl(k)+' via '+info.label+' on '+ddmmyy(f.paidOn)+(f.penaltyApplied?(' · Includes ₹'+f.penaltyApplied+' late penalty ('+f.penaltyPct+'%)'):'')+'. Verified by '+f.verifiedBy+'.',postedBy:f.verifiedBy,postedOn:Util_today(),auto:true});
+    broadcastPush('Payment Received — Flat '+no,fmt(amt)+' for '+lbl(k));
+    vpUpdateBadge();
+  }catch(e){}
+  sv();done++;sentList.push({no:no,k:k,sent:false});
   try{rFlats();rDash();}catch(e){}
   qi++;vpShareLoad();
 };
