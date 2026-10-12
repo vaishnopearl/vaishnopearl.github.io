@@ -11379,9 +11379,9 @@ function vpFlatEntries(idx){
   return out;
 }
 function vpFlatDue(idx){
-  var t=0,p=0;
-  vpFlatEntries(idx).forEach(function(e){if(e.category!=='Maintenance')return;t+=e.amount;if(e.paid)p+=e.amount;});
-  return {total:t,paid:p,due:Math.max(0,t-p)};
+  var t=0,p=0,ms=[];
+  vpFlatEntries(idx).forEach(function(e){if(e.category!=='Maintenance')return;t+=e.amount;if(e.paid)p+=e.amount;else ms.push(e.month);});
+  return {total:t,paid:p,due:Math.max(0,t-p),months:ms};
 }
 function vpFeEsc(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function vpFeCur(){var s=document.getElementById('fe-flat-select');return (s&&s.value)?parseInt(s.value)-1:-1;}
@@ -11623,6 +11623,9 @@ function loadFlatExpenses(){
 
   var d = vpFlatDue(idx);
   document.getElementById('fe-outstanding').textContent = '₹' + d.due.toLocaleString('en-IN');
+  var dd=document.getElementById('fe-due-detail');
+  if(!dd){dd=document.createElement('div');dd.id='fe-due-detail';dd.style.cssText='margin-top:10px;font-size:12px;line-height:1.6;color:var(--muted)';document.getElementById('fe-outstanding').parentNode.appendChild(dd);}
+  dd.innerHTML=d.months.length?('Unpaid months ('+d.months.length+'): <b style="color:var(--err)">'+d.months.map(function(k){return lbl(k);}).join(', ')+'</b><br>If a month is already paid, open <b>Flats</b> → pick that month → <b>Mark Paid</b> (or <b>Payment Details</b> to fix the date).'):'All recorded months are paid ✅';
   var ps=document.getElementById('fe-payment-status');
   if(d.due > 0){
     ps.textContent = '⏳ Pending ₹' + d.due.toLocaleString('en-IN');
