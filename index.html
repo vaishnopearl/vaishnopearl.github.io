@@ -6879,6 +6879,7 @@ function confirmPaymentWithMode(){
     f.paidOn=vpIsoToTs(_iso);f.paidRef=_ref;f.payEditedAt=Date.now();
     applyPenaltyOnPay(f,k);
     sv();closePaymentModal();rFlats();rDash();
+    if((f.stampedUrl||f.stampedData)&&window.vpRestamp)window.vpRestamp(f,f.no,k).then(function(ok){if(ok){try{rFlats();}catch(e){}showToast('🧾 Verified receipt image refreshed');}});
     showToast('✅ Payment details saved');
     return;
   }
@@ -7483,6 +7484,7 @@ function rDash(){rCommittee();rAmcAlert();try{rComplianceAlert();}catch(e){}try{
 // ══════════════════════════════════════════
 function rFlats(){
   try{vpFixPenalties();}catch(e){}
+  try{vpFixRefs();}catch(e){}
   const k=document.getElementById('fm').value;
   const md=gmd(k);
   const paid=md.flats.filter(f=>f.paid).length;
@@ -7548,6 +7550,12 @@ function applyPenaltyOnPay(fl,k){
   }else clr();
 }
 // One-time self-repair: remove penalties wrongly charged to flats that actually paid on/before the due date.
+function vpFixRefs(){
+  // PhonePe full transaction ID for Flat 504 (Oct 2026) was captured truncated; complete it once.
+  try{var f=((st.months['2026-10']||{}).flats||[]).find(function(x){return x.no==='504';});
+  if(f&&f.paid&&f.paidRef==='2610020832495602'){f.paidRef='T2610020832495602097166';f.payEditedAt=Date.now();sv();
+    if((f.stampedUrl||f.stampedData)&&window.vpRestamp)window.vpRestamp(f,'504','2026-10');}}catch(e){}
+}
 function vpFixPenalties(){
   var ch=false;
   Object.keys(st.months||{}).forEach(function(k){
@@ -11913,7 +11921,8 @@ window.vpShareParse=function(text){
   while((m=re.exec(t))){var v=parseFloat(m[1].replace(/,/g,''));if(v>=100){r.amount=String(v);break;}}
   if(!r.amount){var mf=String(st.mf||'');if(mf&&new RegExp('(^|[^\\d])'+mf.replace(/(\d)(?=(\d{3})+$)/g,'$1,?')+'([^\\d]|$)').test(t))r.amount=mf;}
   m=t.match(/(?:upi\s*ref(?:erence)?(?:\s*(?:no|id))?\.?|utr(?:\s*no)?\.?|transaction\s*id|txn\s*id|ref(?:erence)?\s*(?:no|id)?\.?)[^\d]{0,14}(\d{10,16})/i)||t.match(/\b(\d{12})\b/);
-  if(m)r.ref=m[1];
+  var pp=t.match(/\b(T\d{18,26})\b/);   // PhonePe-style full transaction ID (T + digits)
+  if(pp)r.ref=pp[1];else if(m)r.ref=m[1];
   var d=t.match(/\b(\d{1,2})[\s\-\/\.]*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-\/\.,]*(\d{4})\b/i);
   if(d)r.date=iso(d[3],MON[d[2].toLowerCase()],d[1]);
   if(!r.date){d=t.match(/\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\b/);if(d)r.date=iso(d[3],d[2],d[1]);}
@@ -12049,25 +12058,27 @@ window.vpShareConfirm=function(){
 function stampBlob(blob,f,no,k){return new Promise(function(res,rej){
   var url=URL.createObjectURL(blob),img=new Image();
   img.onload=function(){try{
-    var W=Math.min(900,img.naturalWidth),sc=W/img.naturalWidth,H=Math.round(img.naturalHeight*sc),FH=240;
+    var W=Math.min(900,img.naturalWidth),sc=W/img.naturalWidth,H=Math.round(img.naturalHeight*sc),FH=262;
     var c=document.createElement('canvas');c.width=W;c.height=H+FH;var x=c.getContext('2d');if(!x)throw new Error('no canvas');
     x.fillStyle='#fff';x.fillRect(0,0,W,H+FH);x.drawImage(img,0,0,W,H);
     
     var y0=H;x.fillStyle='#f0fdf4';x.fillRect(0,y0,W,FH);x.fillStyle='#15803d';x.fillRect(0,y0,W,6);
-    x.save();x.translate(W-175,y0+138);x.rotate(-0.12);x.fillStyle='rgba(255,255,255,0.9)';x.fillRect(-140,-38,280,76);x.strokeStyle='#15803d';x.lineWidth=6;x.strokeRect(-140,-38,280,76);x.fillStyle='#15803d';x.font='900 44px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText('VERIFIED',0,0);x.restore();
+    x.save();x.translate(W-175,y0+68);x.rotate(-0.12);x.fillStyle='rgba(255,255,255,0.9)';x.fillRect(-140,-38,280,76);x.strokeStyle='#15803d';x.lineWidth=6;x.strokeRect(-140,-38,280,76);x.fillStyle='#15803d';x.font='900 44px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText('VERIFIED',0,0);x.restore();
     x.textAlign='left';x.textBaseline='alphabetic';
     x.font='900 34px Arial';x.fillText('✔ PAYMENT VERIFIED',24,y0+52);
     x.fillStyle='#14532d';x.font='bold 21px Arial';
     var ln=['Flat '+no+' · '+lbl(k)+' · '+fmt(f.amountReceived||st.mf),
-      'Paid on '+(vpPayDate(f)||'-')+' · '+(vpPayMode(f)||'-')+(f.paidRef?(' · Ref '+f.paidRef):''),
+      'Paid on '+(vpPayDate(f)||'-')+' · '+(vpPayMode(f)||'-'),
+      f.paidRef?('Ref '+f.paidRef):'',
       'Verified by '+(f.verifiedBy||'Board')+' · '+ddmmyy_time(f.verifiedAt),
-      'Receipt '+vpReceiptNo(no,k)+' · Code '+vpReceiptCode(no,k,f)];
-    ln.forEach(function(t,i){x.fillText(t.length>62?t.slice(0,60)+'…':t,24,y0+92+i*32);});
+      'Receipt '+vpReceiptNo(no,k)+' · Code '+vpReceiptCode(no,k,f)].filter(Boolean);
+    ln.forEach(function(t,i){var fs=21,mw=(i===0?W-340:W-48);do{x.font='bold '+fs+'px Arial';fs--;}while(x.measureText(t).width>mw&&fs>11);x.fillText(t,24,y0+108+i*30);});
     x.font='13px Arial';x.fillStyle='#166534';x.fillText('Vaishno Pearl FOMACS · ManasaTech Innovations',24,y0+FH-12);
     c.toBlob(function(b){URL.revokeObjectURL(url);b?res(b):rej(new Error('blob'));},'image/jpeg',0.8);
   }catch(e){rej(e);}};
   img.onerror=function(){rej(new Error('image'));};img.src=url;
 });}
+window.vpRestamp=async function(f,no,k){try{var u=f.proofUrl;if(!u)return false;var bl=await (await fetch(u)).blob();await attach(f,no,k,bl,{});return true;}catch(e){return false;}};
 async function attach(f,no,k,blob,item){
   try{
     var stamped=await stampBlob(blob,f,no,k);
