@@ -2558,7 +2558,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
         <option value="cheque">📝 Cheque \u2014 0% fee</option>
       </select>
     </div>
-    <div class="fg"><label class="fl">Payment Date</label><input type="date" id="pm-date"/></div>
+    <div class="fg"><label class="fl">Payment Date</label><input type="date" id="pm-date" onchange="renderPaymentBreakdown()"/></div>
     <div class="fg"><label class="fl">Txn / UTR / Cheque Ref. (optional)</label><input type="text" id="pm-ref" placeholder="e.g. UPI ref or cheque no."/></div>
     <div id="pm-breakdown" style="background:var(--surf);border-radius:10px;padding:12px;margin:8px 0"></div>
     <div class="row2">
@@ -6834,7 +6834,8 @@ function pmCalc(){
   const mode=document.getElementById('pm-mode').value;
   const feeInfo=PAYMENT_MODE_FEES[mode]||{label:mode,pct:0};
   const base=st.mf;
-  const pen=calcPenalty(base,new Date());
+  const _pd=document.getElementById('pm-date'),_pk=vpPendingPayment&&vpPendingPayment.k;
+  const pen=vpPenaltyFor({paidOn:(_pd&&_pd.value)?vpIsoToTs(_pd.value):Date.now(),mfAmt:base},_pk||curKey());
   const penaltyAmt=pen.tier>0?pen.penaltyAmt:0;
   const subtotal=base+penaltyAmt;
   const fee=Math.round(subtotal*(feeInfo.pct/100)*100)/100;
@@ -6870,6 +6871,7 @@ function confirmPaymentWithMode(){
     f.paymentMode=c.mode;f.paymentModeLabel=c.label;
     f.paidMethod=c.label;
     f.paidOn=vpIsoToTs(_iso);f.paidRef=_ref;f.payEditedAt=Date.now();
+    applyPenaltyOnPay(f,k);
     sv();closePaymentModal();rFlats();rDash();
     showToast('✅ Payment details saved');
     return;
@@ -7474,6 +7476,7 @@ function rDash(){rCommittee();rAmcAlert();try{rComplianceAlert();}catch(e){}try{
 // FLATS
 // ══════════════════════════════════════════
 function rFlats(){
+  try{vpFixPenalties();}catch(e){}
   const k=document.getElementById('fm').value;
   const md=gmd(k);
   const paid=md.flats.filter(f=>f.paid).length;
@@ -7517,21 +7520,41 @@ function rFlats(){
       </div>
     </div>`;}).join('');
 }
+function vpPenaltyFor(fl,k){
+  // Penalty depends on the actual PAYMENT DATE (not today's date): paid on/before the 10th = none.
+  var d=new Date(fl.paidOn||Date.now());if(isNaN(d))d=new Date();
+  var pk=mk(d.getFullYear(),d.getMonth()+1);
+  if(pk<k)return calcPenalty(vpFlatAmt(fl),new Date(2000,0,1)); // paid in advance -> none
+  if(pk>k){var x=calcPenalty(vpFlatAmt(fl),new Date(2000,0,25));return x;} // paid in a later month -> highest tier
+  return calcPenalty(vpFlatAmt(fl),d);
+}
 function applyPenaltyOnPay(fl,k){
-  // Automatically imposes the late-payment penalty when a flat is marked Paid after the due date.
+  // Imposes the late-payment penalty based on the date the payment was actually made.
+  var clr=function(){delete fl.penaltyApplied;delete fl.penaltyPct;delete fl.serviceStopped;delete fl.paidLate;delete fl.paidOnDay;};
   if(fl.paid){
-    if(k===curKey()){
-      const pen=calcPenalty(st.mf,new Date());
+    if(k===curKey()||fl.penaltyApplied){
+      const pen=vpPenaltyFor(fl,k);
       if(pen.tier>0){
         fl.penaltyApplied=pen.penaltyAmt;fl.penaltyPct=pen.penaltyPct;
-        fl.serviceStopped=pen.serviceStopped;fl.paidLate=true;fl.paidOnDay=(new Date()).getDate();
-      }else{
-        delete fl.penaltyApplied;delete fl.penaltyPct;delete fl.serviceStopped;delete fl.paidLate;delete fl.paidOnDay;
-      }
+        fl.serviceStopped=pen.serviceStopped;fl.paidLate=true;fl.paidOnDay=(new Date(fl.paidOn||Date.now())).getDate();
+      }else clr();
     }
-  }else{
-    delete fl.penaltyApplied;delete fl.penaltyPct;delete fl.serviceStopped;delete fl.paidLate;delete fl.paidOnDay;
-  }
+  }else clr();
+}
+// One-time self-repair: remove penalties wrongly charged to flats that actually paid on/before the due date.
+function vpFixPenalties(){
+  var ch=false;
+  Object.keys(st.months||{}).forEach(function(k){
+    ((st.months[k]||{}).flats||[]).forEach(function(f){
+      if(!f||!f.paid||!f.penaltyApplied||!f.paidOn)return;
+      var pen=vpPenaltyFor(f,k),old=f.penaltyApplied;
+      if(pen.penaltyAmt===old)return;
+      if(f.amountReceived!=null&&Math.abs(f.amountReceived-(vpFlatAmt(f)+old))<1)f.amountReceived=vpFlatAmt(f)+pen.penaltyAmt;
+      applyPenaltyOnPay(f,k);f.payEditedAt=Date.now();ch=true;
+    });
+  });
+  if(ch)try{sv();}catch(e){}
+  return ch;
 }
 function togF(k,i){
   if(!canEdit()){showToast('Board access only for your role');return;}
