@@ -6889,6 +6889,7 @@ function openPaymentModal(k,i,edit){
 }
 function closePaymentModal(){
   vpPendingPayment=null;
+  try{var _fe=document.getElementById('v-flat-expenses');if(_fe&&_fe.classList.contains('on'))setTimeout(loadFlatExpenses,0);}catch(e){}
   document.getElementById('payment-mode-modal').classList.add('hidden');
 }
 function pmCalc(){
@@ -11625,7 +11626,7 @@ function loadFlatExpenses(){
   document.getElementById('fe-outstanding').textContent = '₹' + d.due.toLocaleString('en-IN');
   var dd=document.getElementById('fe-due-detail');
   if(!dd){dd=document.createElement('div');dd.id='fe-due-detail';dd.style.cssText='margin-top:10px;font-size:12px;line-height:1.6;color:var(--muted)';document.getElementById('fe-outstanding').parentNode.appendChild(dd);}
-  dd.innerHTML=d.months.length?('Unpaid months ('+d.months.length+'): <b style="color:var(--err)">'+d.months.map(function(k){return lbl(k);}).join(', ')+'</b><br>If a month is already paid, open <b>Flats</b> → pick that month → <b>Mark Paid</b> (or <b>Payment Details</b> to fix the date).'):'All recorded months are paid ✅';
+  dd.innerHTML=d.months.length?('Unpaid months ('+d.months.length+'):'+d.months.map(function(k){var fi=((st.months[k]||{}).flats||[]).findIndex(function(x){return x&&String(x.no)===String(FD[idx].no);});return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr)"><b style="color:var(--err)">'+lbl(k)+'</b>'+((typeof canEdit==='function'&&canEdit()&&fi>=0)?'<button class="btn btn-p btn-s" style="width:auto;display:inline-block;padding:6px 14px" onclick="openPaymentModal(\''+k+'\','+fi+',false)">✅ Mark Paid</button>':'')+'</div>';}).join('')):'All recorded months are paid ✅';
   var ps=document.getElementById('fe-payment-status');
   if(d.due > 0){
     ps.textContent = '⏳ Pending ₹' + d.due.toLocaleString('en-IN');
