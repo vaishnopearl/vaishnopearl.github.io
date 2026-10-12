@@ -11484,7 +11484,7 @@ function vpFeApplyOne(idx,k,paid,amt,iso,mode){
     applyPenaltyOnPay(f,k);
   }else{
     f.paid=false;
-    ['paymentMode','paymentModeLabel','paidMethod','paidOn','paidRef','verified','proofUrl','stampedUrl','stampedData','convenienceFee','convenienceFeeGST','amountReceived','verifiedBy','verifiedAt'].forEach(function(x){delete f[x];});
+    ['paymentMode','paymentModeLabel','paidMethod','paidOn','paidRef','verified','proofUrl','stampedUrl','stampedData','hdrV','convenienceFee','convenienceFeeGST','amountReceived','verifiedBy','verifiedAt'].forEach(function(x){delete f[x];});
     applyPenaltyOnPay(f,k);f.payEditedAt=Date.now();
   }
   return true;
@@ -12331,15 +12331,19 @@ async function attach(f,no,k,blob,item){
     if(sm){f.stampedUrl=sm.url;f.stampedPath=sm.path;}
     else if(stamped.size<=180*1024){f.stampedData=await vpReadAsDataURL(stamped);}
     else showToast('Receipt image kept on this phone only (cloud storage off)');
-    f.payEditedAt=Date.now();sv();
+    f.hdrV=1;f.payEditedAt=Date.now();sv();
   }catch(e){showToast('Marked paid, but the receipt image could not be attached');}
 }
 window.vpStampUrl=function(f){return (f&&(f.stampedUrl||f.stampedData))||'';};
-window.vpOpenStamped=function(k,no){var f=gmd(k).flats.find(function(x){return x.no===no;});var u=vpStampUrl(f);if(!u){showToast('No receipt image attached');return;}window.open(u,'_blank');};
+window.vpAddHdr=function(blob){return vpLoadLogo().then(function(){return new Promise(function(res,rej){var url=URL.createObjectURL(blob),img=new Image();img.onload=function(){try{var W=Math.min(900,img.naturalWidth),sc=W/img.naturalWidth,H=Math.round(img.naturalHeight*sc),HD=156;var c=document.createElement('canvas');c.width=W;c.height=HD+H;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,HD+H);vpDrawHdr(x,W,HD-6);x.drawImage(img,0,HD,W,H);c.toBlob(function(b){URL.revokeObjectURL(url);b?res(b):rej(new Error('blob'));},'image/jpeg',0.85);}catch(e){rej(e);}};img.onerror=function(){rej(new Error('img'));};img.src=url;});});};
+window.vpHdrBlob=async function(f,blob){if(!blob||f.hdrV)return blob;try{return await vpAddHdr(blob);}catch(e){return blob;}};
+window.vpOpenStamped=async function(k,no){var f=gmd(k).flats.find(function(x){return x.no===no;});var u=vpStampUrl(f);if(!u){showToast('No receipt image attached');return;}
+  if(f.hdrV){window.open(u,'_blank');return;}
+  var w=window.open('','_blank');try{var bl=await (await fetch(u)).blob();var nb=await vpAddHdr(bl);var nu=URL.createObjectURL(nb);if(w)w.location.href=nu;else window.open(nu,'_blank');}catch(e){if(w)w.location.href=u;else window.open(u,'_blank');}};
 window.vpSendStamped=async function(no,k){
   var f=gmd(k).flats.find(function(x){return x.no===no;});if(!f)return;
   var blob=(window.vpStampMem||{})[no+'|'+k]||null;
-  try{if(!blob){var u=vpStampUrl(f);if(!u){showToast('No receipt image attached');return;}blob=await (await fetch(u)).blob();}}catch(e){}
+  try{if(!blob){var u=vpStampUrl(f);if(!u){showToast('No receipt image attached');return;}blob=await (await fetch(u)).blob();blob=await vpHdrBlob(f,blob);}}catch(e){}
   var fl=FD.find(function(x){return x.no===no;})||{};
   var text='✅ Payment verified — Flat '+no+' · '+lbl(k)+' · '+fmt(f.amountReceived||st.mf)+'. Your verified receipt is attached. — Vaishno Pearl FOMACS';
   if(blob&&navigator.canShare&&navigator.share){
