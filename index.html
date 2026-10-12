@@ -673,6 +673,7 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div><div class="cflb">💰 Carry Forward Balance</div><div style="font-size:10px;color:var(--gold);margin-top:2px">Cumulative surplus · tap for month-wise details</div></div>
     <div class="cfv" id="d-cf">₹0</div>
   </div>
+  <div class="card" id="vp-cf-card"><div class="ctitle">📅 Month-wise Carry Forward</div><div id="vp-cf-body"></div></div>
   <div class="card">
     <div class="ctitle">Month Summary</div>
     <div class="sr"><span class="slb">Maintenance / flat</span><span id="d-mf">₹1,500</span></div>
@@ -12891,26 +12892,26 @@ window.vpSmartRender=function(){
 })();
 </script>
 <script>
+function vpCfTable(upto,hl){
+  var run=0,rows='';
+  allKeys().filter(function(k){return k<=upto&&st.months[k];}).forEach(function(k){
+    var md=st.months[k],c=vpColl(md),e=(md.expenses||[]).reduce(function(a,x){return a+(+x.amount||0);},0);
+    if(!c&&!e)return;
+    var op=run;run+=c-e;
+    rows+='<tr'+(k===hl?' style="background:#fef9e7;font-weight:700"':'')+'><td style="padding:6px 4px">'+lbl(k)+'</td><td style="text-align:right">'+fmt(op)+'</td><td style="text-align:right;color:'+(c-e<0?'#b91c1c':'#15803d')+'">'+(c-e<0?'−':'+')+fmt(Math.abs(c-e))+'</td><td style="text-align:right;font-weight:800">'+fmt(run)+'</td></tr>';
+  });
+  return '<table style="width:100%;border-collapse:collapse;font-size:11.5px"><tr style="background:#1a3a5c;color:#fff"><th style="padding:6px 4px;text-align:left">Month</th><th style="text-align:right">B/F (opening)</th><th style="text-align:right">Collected − Spent</th><th style="text-align:right">C/F (closing)</th></tr>'+rows+'</table>';
+}
+function vpCfRender(){try{var d=document.getElementById('dm'),b=document.getElementById('vp-cf-body');if(!d||!b)return;b.innerHTML='<div style="overflow-x:auto">'+vpCfTable(d.value,d.value)+'</div><p style="font-size:10px;color:var(--muted);margin-top:6px">C/F of a month = B/F + maintenance collected − expenses. It becomes the next month\'s B/F.</p>';}catch(e){}}
+(function(){var o=window.rDash;if(typeof o==='function'){window.rDash=function(){var r=o.apply(this,arguments);vpCfRender();return r;};}})();
 function vpCfBreak(){
-  try{
-    var upto=document.getElementById('dm').value,run=0,rows='';
-    allKeys().filter(function(k){return k<=upto&&st.months[k];}).forEach(function(k){
-      var md=st.months[k],c=vpColl(md),e=(md.expenses||[]).reduce(function(a,x){return a+(+x.amount||0);},0);
-      if(!c&&!e)return;
-      run+=c-e;
-      rows+='<tr><td>'+lbl(k)+'</td><td style="text-align:right;color:#15803d">'+fmt(c)+'</td><td style="text-align:right;color:#b91c1c">'+fmt(e)+'</td><td style="text-align:right">'+fmt(c-e)+'</td><td style="text-align:right;font-weight:700">'+fmt(run)+'</td></tr>';
-    });
-    var d=document.getElementById('vp-cfb');if(d)d.remove();
-    d=document.createElement('div');d.id='vp-cfb';
-    d.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center';
-    d.onclick=function(ev){if(ev.target===d)d.remove();};
-    d.innerHTML='<div style="background:#fff;color:#111;width:100%;max-width:560px;max-height:85vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:15px">💰 Carry Forward — month by month</b><button onclick="document.getElementById(\'vp-cfb\').remove()" style="border:0;background:#eee;border-radius:8px;padding:6px 10px">✕</button></div>'+
-      '<p style="font-size:11px;color:#6b7280;margin:6px 0 10px">Carry Forward = Σ (maintenance collected − expenses) of every month up to '+lbl(upto)+'. Penalties, festival and other receipts are not included.</p>'+
-      '<table style="width:100%;border-collapse:collapse;font-size:11.5px"><tr style="background:#1a3a5c;color:#fff"><th style="padding:6px;text-align:left">Month</th><th style="padding:6px">Collected</th><th style="padding:6px">Expenses</th><th style="padding:6px">Net</th><th style="padding:6px">Running</th></tr>'+rows+'</table>'+
-      '<div style="margin-top:10px;font-size:13px;font-weight:800;text-align:right">Carry Forward: '+fmt(run)+'</div></div>';
-    document.body.appendChild(d);
-  }catch(e){showToast('Could not open breakdown');}
+  var d0=document.getElementById('vp-cfb');if(d0)d0.remove();
+  var d=document.createElement('div');d.id='vp-cfb';
+  d.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center';
+  d.onclick=function(ev){if(ev.target===d)d.remove();};
+  var m=document.getElementById('dm').value;
+  d.innerHTML='<div style="background:#fff;color:#111;width:100%;max-width:560px;max-height:85vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px"><div style="display:flex;justify-content:space-between"><b>💰 Month-wise Carry Forward</b><button onclick="this.closest(\'#vp-cfb\').remove()" style="border:0;background:#eee;border-radius:8px;padding:6px 10px">✕</button></div><div style="margin-top:10px">'+vpCfTable(m,m)+'</div></div>';
+  document.body.appendChild(d);
 }
 </script>
 </body></html>
