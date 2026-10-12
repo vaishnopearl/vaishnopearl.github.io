@@ -8782,7 +8782,21 @@ function vpShareText(msg, waUrl){
   }
 }
 /* ===== Receipt as a real IMAGE FILE, shareable to WhatsApp as an attachment ===== */
-function vpReceiptImage(flatNo,k){
+function vpLoadLogo(){return new Promise(function(res){try{if(window.__vpLogoImg&&window.__vpLogoImg.complete){res(window.__vpLogoImg);return;}var src=vpLogoSrc();if(!src){res(null);return;}var i=new Image();i.onload=function(){window.__vpLogoImg=i;res(i);};i.onerror=function(){res(null);};i.src=src;}catch(e){res(null);}});}
+function vpDrawHdr(x,W,HH){
+  x.fillStyle='#16346B';x.fillRect(0,0,W,HH);x.fillStyle='#C9A84A';x.fillRect(0,HH,W,6);
+  var L=window.__vpLogoImg,ls=Math.min(104,HH-30),tx=28;
+  if(L&&L.complete&&L.naturalWidth){x.save();x.beginPath();var ly=(HH-ls)/2,r=18;x.moveTo(28+r,ly);x.arcTo(28+ls,ly,28+ls,ly+ls,r);x.arcTo(28+ls,ly+ls,28,ly+ls,r);x.arcTo(28,ly+ls,28,ly,r);x.arcTo(28,ly,28+ls,ly,r);x.closePath();x.clip();x.drawImage(L,28,ly,ls,ls);x.restore();tx=28+ls+22;}
+  x.textAlign='left';x.textBaseline='alphabetic';
+  var fit=function(t,font,fs,mw){do{x.font=font.replace('##',fs);fs--;}while(x.measureText(t).width>mw&&fs>9);};
+  var mw=W-tx-20,y=HH/2-30;
+  x.fillStyle='#C9A84A';fit('VAISHNO PEARL','bold ##px Segoe UI, Arial',38,mw);x.fillText('VAISHNO PEARL',tx,y+4);
+  x.fillStyle='#ffffff';fit('Flat Owners Mutually Aided Co-operative Society','500 ##px Segoe UI, Arial',19,mw);x.fillText('Flat Owners Mutually Aided Co-operative Society',tx,y+30);
+  x.fillStyle='#C6D2E8';var ad='Opp. Vistra Delight Apt, Survey No. 235/236, Kompally, Hyderabad - 500100';fit(ad,'500 ##px Segoe UI, Arial',14,mw);x.fillText(ad,tx,y+52);
+  var rg='Reg. No: TG/MLKG/MACS/2025-300/FOW & M';fit(rg,'500 ##px Segoe UI, Arial',13,mw);x.fillText(rg,tx,y+71);
+}
+function vpReceiptImage(flatNo,k){return vpLoadLogo().then(function(){return vpReceiptImage0(flatNo,k);});}
+function vpReceiptImage0(flatNo,k){
   return new Promise(function(resolve,reject){
     try{
       var flat=(FD||[]).find(function(f){return f.no===flatNo;});
@@ -8797,19 +8811,10 @@ function vpReceiptImage(flatNo,k){
       /* background */
       x.fillStyle='#ffffff'; x.fillRect(0,0,W,H);
       /* header band */
-      x.fillStyle='#16346B'; x.fillRect(0,0,W,150);
-      x.fillStyle='#C9A84A'; x.fillRect(0,150,W,7);
-
+      vpDrawHdr(x,W,170);
       x.textAlign='center';
-      x.fillStyle='#C9A84A'; x.font='bold 40px Segoe UI, Arial';
-      x.fillText('VAISHNO PEARL', W/2, 62);
-      x.fillStyle='#ffffff'; x.font='500 20px Segoe UI, Arial';
-      x.fillText('Flat Owners Mutually Aided Co-operative Society', W/2, 95);
-      x.font='500 17px Segoe UI, Arial'; x.fillStyle='#C6D2E8';
-      x.fillText('Kompally, Hyderabad', W/2, 122);
-
       x.fillStyle='#16346B'; x.font='bold 32px Segoe UI, Arial';
-      x.fillText('MAINTENANCE RECEIPT', W/2, 215);
+      x.fillText('MAINTENANCE RECEIPT', W/2, 232);
 
       /* detail rows */
       var rows=[
@@ -12291,14 +12296,15 @@ window.vpShareConfirm=function(){
   attach(f,no,k,cur,item).then(function(){busy=false;try{rFlats();}catch(e){}qi++;vpShareLoad();});
 };
 (function(){try{var i=new Image();i.onload=function(){window.__mtImg=i;};i.src=MT_LOGO_SM;}catch(e){}})();
-function stampBlob(blob,f,no,k){return new Promise(function(res,rej){
+function stampBlob(blob,f,no,k){return vpLoadLogo().then(function(){return stampBlob0(blob,f,no,k);});}
+function stampBlob0(blob,f,no,k){return new Promise(function(res,rej){
   var url=URL.createObjectURL(blob),img=new Image();
   img.onload=function(){try{
-    var W=Math.min(900,img.naturalWidth),sc=W/img.naturalWidth,H=Math.round(img.naturalHeight*sc),FH=262;
-    var c=document.createElement('canvas');c.width=W;c.height=H+FH;var x=c.getContext('2d');if(!x)throw new Error('no canvas');
-    x.fillStyle='#fff';x.fillRect(0,0,W,H+FH);x.drawImage(img,0,0,W,H);
+    var W=Math.min(900,img.naturalWidth),sc=W/img.naturalWidth,H=Math.round(img.naturalHeight*sc),FH=262,HD=156;
+    var c=document.createElement('canvas');c.width=W;c.height=HD+H+FH;var x=c.getContext('2d');if(!x)throw new Error('no canvas');
+    x.fillStyle='#fff';x.fillRect(0,0,W,HD+H+FH);vpDrawHdr(x,W,HD-6);x.drawImage(img,0,HD,W,H);
     
-    var y0=H;window.__mtImg=window.__mtImg||null;x.fillStyle='#f0fdf4';x.fillRect(0,y0,W,FH);x.fillStyle='#15803d';x.fillRect(0,y0,W,6);
+    var y0=HD+H;window.__mtImg=window.__mtImg||null;x.fillStyle='#f0fdf4';x.fillRect(0,y0,W,FH);x.fillStyle='#15803d';x.fillRect(0,y0,W,6);
     x.save();x.translate(W-175,y0+68);x.rotate(-0.12);x.fillStyle='rgba(255,255,255,0.9)';x.fillRect(-140,-38,280,76);x.strokeStyle='#15803d';x.lineWidth=6;x.strokeRect(-140,-38,280,76);x.fillStyle='#15803d';x.font='900 44px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText('VERIFIED',0,0);x.restore();
     x.textAlign='left';x.textBaseline='alphabetic';
     x.font='900 34px Arial';x.fillText('✔ PAYMENT VERIFIED',24,y0+52);
