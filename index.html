@@ -11676,50 +11676,55 @@ function printFlatExpenses(){
   window.print();
 }
 
+var vpYoyKind='bar';
+function vpYoyType(k){vpYoyKind=k;loadYoYExpenses();}
 function loadYoYExpenses(){
-  var flatSel = document.getElementById('fe-flat-select');
-  var catSel = document.getElementById('fe-yoy-category');
-
-  if(!flatSel||!flatSel.value){
-    document.getElementById('fe-yoy-chart').innerHTML='<p style="color:var(--muted);font-size:12px">Please select a flat</p>';
-    return;
+  var box=document.getElementById('fe-yoy-chart'),catSel=document.getElementById('fe-yoy-category');
+  var idx=vpFeCur();
+  if(idx<0){box.innerHTML='<p style="color:var(--muted);font-size:12px">Please select a flat</p>';return;}
+  var cat=catSel?catSel.value:'';
+  var all=vpFlatEntries(idx);if(cat)all=all.filter(function(e){return e.category===cat;});
+  var by={},ks=[];
+  for(var i=11;i>=0;i--){var k=mkAdd(curKey(),-i);ks.push(k);by[k]={amt:0,unpaid:0};}
+  all.forEach(function(e){if(by[e.month]){by[e.month].amt+=+e.amount||0;if(!e.paid)by[e.month].unpaid+=+e.amount||0;}});
+  if(!all.length){box.innerHTML='<p style="color:var(--muted);font-size:12px">No entries found for this category</p>';return;}
+  var PAL=['#2563eb','#16a34a','#f59e0b','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#4f46e5','#0d9488','#be123c'];
+  var vals=ks.map(function(k){return by[k].amt;}),mx=Math.max.apply(null,vals.concat([1])),tot=vals.reduce(function(a,b){return a+b;},0);
+  var sh=function(k){return ML[+k.split('-')[1]-1].slice(0,3);},yy=function(k){return k.slice(2,4);};
+  var kf=function(n){return n>=1000?(Math.round(n/100)/10)+'k':String(n);};
+  var W=360,H=200,pl=8,pr=8,pt=18,pb=34,iw=W-pl-pr,ih=H-pt-pb,svg='',kind=vpYoyKind;
+  var uid='g'+Date.now();
+  var grid='';[0.25,0.5,0.75,1].forEach(function(f){var y=pt+ih*(1-f);grid+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y+'" y2="'+y+'" stroke="var(--bdr)" stroke-dasharray="3 3"/>';});
+  var xl=function(i,cx){return '<text x="'+cx+'" y="'+(H-18)+'" text-anchor="middle" font-size="8.5" font-weight="700" fill="var(--muted)">'+sh(ks[i])+'</text><text x="'+cx+'" y="'+(H-8)+'" text-anchor="middle" font-size="7.5" fill="var(--light)">'+yy(ks[i])+'</text>';};
+  if(kind==='bar'){
+    var step=iw/12,bw=step*0.62;svg='<defs>'+PAL.map(function(c,i){return '<linearGradient id="'+uid+i+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+c+'"/><stop offset="1" stop-color="'+c+'" stop-opacity=".55"/></linearGradient>';}).join('')+'</defs>'+grid;
+    vals.forEach(function(v,i){var h=ih*v/mx,x=pl+i*step+(step-bw)/2,y=pt+ih-h,un=by[ks[i]].unpaid>0;
+      svg+='<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+Math.max(h,v?2:0)+'" rx="4" fill="url(#'+uid+i+')"'+(un?' stroke="#dc2626" stroke-width="1.6" stroke-dasharray="3 2"':'')+'><title>'+lbl(ks[i])+' '+fmt(v)+(un?' (unpaid)':'')+'</title></rect>';
+      if(v)svg+='<text x="'+(x+bw/2)+'" y="'+(y-3)+'" text-anchor="middle" font-size="7.5" font-weight="800" fill="'+PAL[i]+'">'+kf(v)+'</text>';
+      svg+=xl(i,x+bw/2);});
+  }else if(kind==='line'||kind==='area'){
+    var step2=iw/11,pts=vals.map(function(v,i){return [pl+i*step2,pt+ih-ih*v/mx];});
+    var d='M'+pts.map(function(q){return q[0]+' '+q[1];}).join(' L');
+    svg='<defs><linearGradient id="'+uid+'a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2563eb" stop-opacity=".45"/><stop offset="1" stop-color="#2563eb" stop-opacity="0"/></linearGradient><linearGradient id="'+uid+'l" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#7c3aed"/><stop offset=".5" stop-color="#2563eb"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs>'+grid;
+    if(kind==='area')svg+='<path d="'+d+' L'+pts[pts.length-1][0]+' '+(pt+ih)+' L'+pts[0][0]+' '+(pt+ih)+' Z" fill="url(#'+uid+'a)"/>';
+    svg+='<path d="'+d+'" fill="none" stroke="url(#'+uid+'l)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+    pts.forEach(function(q,i){var un=by[ks[i]].unpaid>0;svg+='<circle cx="'+q[0]+'" cy="'+q[1]+'" r="4.6" fill="'+(un?'#fff':PAL[i])+'" stroke="'+(un?'#dc2626':'#fff')+'" stroke-width="2"><title>'+lbl(ks[i])+' '+fmt(vals[i])+'</title></circle>';svg+=xl(i,q[0]);if(vals[i])svg+='<text x="'+q[0]+'" y="'+(q[1]-8)+'" text-anchor="middle" font-size="7.5" font-weight="800" fill="'+PAL[i]+'">'+kf(vals[i])+'</text>';});
+  }else if(kind==='hbar'){
+    var rh=15,H2=12*rh+6;svg='';box.dataset.h=H2;
+    vals.forEach(function(v,i){var w=(W-110)*v/mx,y=i*rh+3;svg+='<text x="0" y="'+(y+10)+'" font-size="9" font-weight="700" fill="var(--muted)">'+sh(ks[i])+' '+yy(ks[i])+'</text><rect x="46" y="'+y+'" width="'+Math.max(w,v?2:0)+'" height="11" rx="5.5" fill="'+PAL[i]+'"'+(by[ks[i]].unpaid>0?' fill-opacity=".45" stroke="#dc2626" stroke-dasharray="3 2"':'')+'/><text x="'+(50+w)+'" y="'+(y+9.5)+'" font-size="8.5" font-weight="800" fill="'+PAL[i]+'">'+(v?fmt(v):'—')+'</text>';});
+    H=H2;
+  }else{ // donut
+    var cx=100,cy=100,r=70,C=2*Math.PI*r,off=0;H=200;svg='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--bdr)" stroke-width="28"/>';
+    vals.forEach(function(v,i){if(!v)return;var len=C*v/tot;svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+PAL[i]+'" stroke-width="28" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 '+cx+' '+cy+')"><title>'+lbl(ks[i])+' '+fmt(v)+'</title></circle>';off+=len;});
+    svg+='<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="11" fill="var(--muted)" font-weight="700">12-month total</text><text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" font-size="20" font-weight="900" fill="var(--P)">'+fmt(tot)+'</text>';
+    var lg='';vals.forEach(function(v,i){if(!v)return;lg+='<text x="215" y="'+(18+i*14)+'" font-size="9" font-weight="700" fill="'+PAL[i]+'">● '+sh(ks[i])+' '+yy(ks[i])+'  '+fmt(v)+'</text>';});svg+=lg;
   }
-
-  var selectedCat = catSel?catSel.value:'';
-
-  var allExp = vpFlatEntries(vpFeCur());
-  if(selectedCat){ allExp = allExp.filter(e=>e.category===selectedCat); }
-  var byMonth = {};
-  for(var i=11;i>=0;i--){
-    var d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-i);
-    var mon = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    byMonth[mon] = {month:mon, amount:0};
-  }
-  allExp.forEach(e=>{ if(byMonth[e.month]) byMonth[e.month].amount += parseFloat(e.amount||0); });
-  var months = Object.keys(byMonth).sort();
-  var amounts = months.map(m=>byMonth[m].amount);
-  var labels = months.map(m=>lbl(m).replace(/ 20/,' '));
-
-  // Create simple chart HTML
-  var maxAmount = Math.max(...amounts, 1);
-  var chartHtml = '<div style="display:flex;align-items:flex-end;justify-content:space-around;height:160px;gap:6px;padding:12px;border:1px solid var(--bdr);border-radius:10px;background:var(--surf)">';
-
-  amounts.forEach(function(amt,idx){
-    var height = (amt/maxAmount)*140;
-    chartHtml += `<div style="display:flex;flex-direction:column;align-items:center;flex:1">
-      <div style="height:${height}px;background:var(--P);border-radius:4px;width:100%;min-height:4px" title="₹${amt.toLocaleString('en-IN')}"></div>
-      <div style="font-size:8px;color:var(--muted);margin-top:4px;text-align:center">${labels[idx]}</div>
-    </div>`;
-  });
-
-  chartHtml += '</div>';
-  chartHtml += '<div style="margin-top:8px;font-size:11px;color:var(--muted)">Max: ₹'+maxAmount.toLocaleString('en-IN')+'</div>';
-
-  if(!allExp.length){
-    chartHtml = '<p style="color:var(--muted);font-size:12px">No entries found for this category</p>';
-  }
-
-  document.getElementById('fe-yoy-chart').innerHTML = chartHtml;
+  var vw=(kind==='donut')?(W):W;
+  var chips=[['bar','📊 Bar'],['line','📈 Line'],['area','🌄 Area'],['hbar','📶 Horizontal'],['donut','🍩 Donut']].map(function(c){return '<button class="chip'+(kind===c[0]?' on':'')+'" onclick="vpYoyType(\''+c[0]+'\')">'+c[1]+'</button>';}).join('');
+  var up=ks.filter(function(k){return by[k].unpaid>0;}).length;
+  box.innerHTML='<div class="doc-filter" style="margin-bottom:8px;flex-wrap:wrap">'+chips+'</div>'+
+    '<div style="padding:10px;border:1px solid var(--bdr);border-radius:16px;background:linear-gradient(180deg,var(--white),var(--PL))"><svg viewBox="0 0 '+vw+' '+H+'" style="width:100%;height:auto;display:block" role="img" aria-label="Monthly chart">'+svg+'</svg></div>'+
+    '<div style="margin-top:8px;font-size:11px;color:var(--muted)">Max: <b>'+fmt(mx)+'</b> · 12-month total <b>'+fmt(tot)+'</b>'+(up?' · <span style="color:#dc2626">dashed red outline = unpaid ('+up+')</span>':'')+'</div>';
 }
 
 function sendPaymentReminder(){
