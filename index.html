@@ -11386,6 +11386,84 @@ function vpFlatDue(idx){
 }
 function vpFeEsc(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function vpFeCur(){var s=document.getElementById('fe-flat-select');return (s&&s.value)?parseInt(s.value)-1:-1;}
+
+/* ── Manual update panel (per flat, per month) with Auto-update toggle + Save ── */
+var vpFeSt={idx:-1,ch:{}};
+function vpFeAutoOn(){try{return localStorage.getItem('vpFeAuto')!=='0';}catch(e){return true;}}
+function vpFeSetAuto(on){try{localStorage.setItem('vpFeAuto',on?'1':'0');}catch(e){}
+  if(on&&Object.keys(vpFeSt.ch).length){if(confirm('Turn on Auto-update? Your '+Object.keys(vpFeSt.ch).length+' unsaved change(s) will be saved now.'))vpFeSave();else{vpFeSetAutoUi();return;}}
+  vpFeManualRender();}
+function vpFeSetAutoUi(){var c=document.getElementById('fe-auto-cb');if(c)c.checked=vpFeAutoOn();}
+function vpFeFlat(idx,k){var f=FD[idx];if(!f||!st.months[k])return null;var fl=st.months[k].flats||[];return fl.find(function(x){return x&&String(x.no)===String(f.no);})||null;}
+function vpFeApplyOne(idx,k,paid,amt,iso,mode){
+  var f=vpFeFlat(idx,k);if(!f)return false;
+  var info=PAYMENT_MODE_FEES[mode]||{label:mode};
+  if(amt>0&&amt!==vpFlatAmt(f))f.mfAmt=amt;
+  if(paid){
+    f.paid=true;f.verifiedBy=(ROLES[currentRole]||{}).label||'Managing Committee';f.verifiedAt=Date.now();
+    f.paidOn=vpIsoToTs(iso);f.paymentMode=mode;f.paymentModeLabel=info.label;f.paidMethod=info.label;
+    f.amountReceived=vpFlatAmt(f);
+    f.payEditedAt=Date.now();
+    applyPenaltyOnPay(f,k);
+  }else{
+    f.paid=false;
+    ['paymentMode','paymentModeLabel','paidMethod','paidOn','paidRef','verified','proofUrl','stampedUrl','stampedData','convenienceFee','convenienceFeeGST','amountReceived','verifiedBy','verifiedAt'].forEach(function(x){delete f[x];});
+    applyPenaltyOnPay(f,k);f.payEditedAt=Date.now();
+  }
+  return true;
+}
+function vpFeOpts(){
+  var d=document.getElementById('fe-m-date'),m=document.getElementById('fe-m-mode');
+  return {iso:(d&&d.value)||vpTodayIso(),mode:(m&&m.value)||'upi'};
+}
+function vpFeCommit(idx,k,ch){
+  var o=vpFeOpts();var f=vpFeFlat(idx,k);if(!f)return;
+  vpFeApplyOne(idx,k,ch.paid!=null?ch.paid:!!f.paid,ch.amt!=null?ch.amt:vpFlatAmt(f),o.iso,o.mode);
+}
+function vpFeTog(k,on){
+  if(!canEdit()){showToast('Board access only');return;}
+  var idx=vpFeCur();if(idx<0)return;
+  if(vpFeSt.idx!==idx)vpFeSt={idx:idx,ch:{}};
+  if(vpFeAutoOn()){vpFeCommit(idx,k,{paid:on});sv();vpFeRefreshAll();showToast((on?'✅ Marked paid · ':'⚠️ Marked unpaid · ')+lbl(k));}
+  else{var f=vpFeFlat(idx,k),c=vpFeSt.ch[k]||{};c.paid=on;if(f&&!!f.paid===on&&c.amt==null)delete vpFeSt.ch[k];else vpFeSt.ch[k]=c;vpFeManualRender();}
+}
+function vpFeAmt(k,v){
+  if(!canEdit())return;var idx=vpFeCur();if(idx<0)return;v=parseFloat(v);if(!(v>=0)){vpFeManualRender();return;}
+  if(vpFeSt.idx!==idx)vpFeSt={idx:idx,ch:{}};
+  if(vpFeAutoOn()){var f=vpFeFlat(idx,k);if(f){f.mfAmt=v;if(f.paid)f.amountReceived=v;f.payEditedAt=Date.now();sv();vpFeRefreshAll();showToast('💾 Amount saved · '+lbl(k));}}
+  else{var c=vpFeSt.ch[k]||{};c.amt=v;vpFeSt.ch[k]=c;vpFeManualRender();}
+}
+function vpFeSave(){
+  if(!canEdit())return;var idx=vpFeSt.idx,ks=Object.keys(vpFeSt.ch);if(idx<0||!ks.length){showToast('No changes to save');return;}
+  ks.forEach(function(k){vpFeCommit(idx,k,vpFeSt.ch[k]);});
+  vpFeSt={idx:idx,ch:{}};sv();vpFeRefreshAll();showToast('💾 Saved '+ks.length+' change(s) · '+ddmmyy_time());
+}
+function vpFeDiscard(){vpFeSt={idx:vpFeCur(),ch:{}};vpFeManualRender();showToast('Changes discarded');}
+function vpFeRefreshAll(){try{loadFlatExpenses();}catch(e){}try{rDash();}catch(e){}try{rFlats();}catch(e){}}
+function vpFeManualRender(){
+  var anchor=document.getElementById('fe-outstanding');if(!anchor)return;
+  var card=anchor.closest('.card')||anchor.parentNode,box=document.getElementById('fe-manual');
+  if(!canEdit()){if(box)box.remove();return;}
+  var idx=vpFeCur();
+  if(idx<0){if(box)box.remove();return;}
+  if(!box){box=document.createElement('div');box.id='fe-manual';box.className='card';card.parentNode.insertBefore(box,card.nextSibling);}
+  if(vpFeSt.idx!==idx)vpFeSt={idx:idx,ch:{}};
+  var auto=vpFeAutoOn(),n=Object.keys(vpFeSt.ch).length,pd=(document.getElementById('fe-m-date')||{}).value||vpTodayIso(),pm=(document.getElementById('fe-m-mode')||{}).value||'upi';
+  var ks=Object.keys(st.months).filter(function(k){return /^\d{4}-\d{2}$/.test(k)&&k<=curKey();}).sort().reverse();
+  var rows=ks.map(function(k){
+    var f=vpFeFlat(idx,k);if(!f)return '';
+    var c=vpFeSt.ch[k]||{},paid=c.paid!=null?c.paid:!!f.paid,amt=c.amt!=null?c.amt:vpFlatAmt(f),dirty=!!vpFeSt.ch[k];
+    return '<div class="fm-row'+(dirty?' dirty':'')+'"><div class="fm-m"><b>'+lbl(k)+'</b><span>'+(f.paid&&!dirty?(vpPayLine(f)||'paid'):(dirty?'unsaved':'—'))+'</span></div>'+
+      '<input type="number" inputmode="decimal" class="fm-amt" value="'+amt+'" min="0" onchange="vpFeAmt(\''+k+'\',this.value)" aria-label="Amount"/>'+
+      '<label class="fm-sw"><input type="checkbox" '+(paid?'checked':'')+' onchange="vpFeTog(\''+k+'\',this.checked)"/><i></i></label></div>';
+  }).join('');
+  var modes=Object.keys(PAYMENT_MODE_FEES).map(function(m){return '<option value="'+m+'"'+(m===pm?' selected':'')+'>'+PAYMENT_MODE_FEES[m].label+'</option>';}).join('');
+  box.innerHTML='<div class="ctitle">✍️ Manual Update · Flat '+vpFeEsc(FD[idx].no)+'</div>'+
+    '<div class="fm-auto"><div><b>⚡ Auto-update</b><span>'+(auto?'ON – each change is saved instantly':'OFF – changes are saved only when you tap Save')+'</span></div><label class="fm-sw"><input type="checkbox" id="fe-auto-cb" '+(auto?'checked':'')+' onchange="vpFeSetAuto(this.checked)"/><i></i></label></div>'+
+    '<div class="row2" style="margin:10px 0"><div class="fg" style="flex:1;margin:0"><label class="fl">Payment date (for months you mark paid)</label><input type="date" id="fe-m-date" value="'+pd+'" max="'+vpTodayIso()+'"/></div><div class="fg" style="flex:1;margin:0"><label class="fl">Paid via</label><select id="fe-m-mode">'+modes+'</select></div></div>'+
+    '<div class="fm-head"><span>Month</span><span>Amount ₹</span><span>Paid</span></div>'+rows+
+    (auto?'':'<div class="row2" style="margin-top:12px"><button class="btn btn-p" style="flex:2" onclick="vpFeSave()" '+(n?'':'disabled')+'>💾 Save'+(n?' ('+n+')':'')+'</button><button class="btn btn-o" style="flex:1" onclick="vpFeDiscard()" '+(n?'':'disabled')+'>↩ Discard</button></div>');
+}
 function initFlatExpensesTab(){
   var flatSel = document.getElementById('fe-flat-select');
   if(flatSel){
@@ -11648,6 +11726,7 @@ function loadFlatExpenses(){
       <div class="eam">₹${(+e.amount||0).toLocaleString('en-IN')}</div>
     </div>`).join('');
   document.getElementById('fe-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No entries for this flat in this period</div>';
+  try{vpFeManualRender();}catch(e){console.error(e);}
 }
 
 function exportFlatExpensesCSV(){
@@ -12527,6 +12606,21 @@ body{background:radial-gradient(1200px 500px at 85% -10%,rgba(35,74,131,.10),tra
 .btn:active{transform:scale(.98)}
 .chip{border-radius:999px}
 @media (prefers-reduced-motion:reduce){.view.on{animation:none}*{transition:none!important}}
+.fm-auto{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:var(--PL)}
+.fm-auto b{display:block;font-size:13px}.fm-auto span{font-size:11px;color:var(--muted)}
+.fm-head,.fm-row{display:grid;grid-template-columns:1fr 92px 56px;gap:8px;align-items:center}
+.fm-head{font-size:10px;font-weight:800;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;padding:0 2px 6px;border-bottom:1px solid var(--bdr)}
+.fm-head span:nth-child(3){text-align:center}
+.fm-row{padding:8px 2px;border-bottom:1px solid var(--bdr)}
+.fm-row.dirty{background:var(--warnB);border-radius:10px}
+.fm-m b{display:block;font-size:13px}.fm-m span{font-size:10.5px;color:var(--muted)}
+.fm-amt{width:100%;box-sizing:border-box;padding:8px;border:1.5px solid var(--bdr);border-radius:10px;font-size:13px;font-weight:700;background:var(--white);color:var(--txt);font-family:inherit}
+.fm-sw{position:relative;display:inline-block;width:46px;height:26px;justify-self:center}
+.fm-sw input{opacity:0;width:0;height:0;position:absolute}
+.fm-sw i{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:background .18s;cursor:pointer}
+.fm-sw i:after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .18s}
+.fm-sw input:checked+i{background:var(--ok)}.fm-sw input:checked+i:after{transform:translateX(20px)}
+.btn[disabled]{opacity:.5;pointer-events:none}
 /* Smart Hub */
 .sh-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 18px;margin-bottom:12px;border-radius:24px;color:#fff;background:linear-gradient(135deg,#234a83,#13294e 65%,#7a5410);box-shadow:0 10px 30px rgba(19,41,78,.35);position:relative;overflow:hidden}
 .sh-hero:after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.18),transparent 70%)}
