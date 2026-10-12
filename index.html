@@ -391,8 +391,9 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--P);box-s
   .role-grid{grid-template-columns:repeat(4,1fr)}
 }
 @media print{
-  .login,.topbar,.tabbar,.toast,.rbadge,#__buildtag{display:none!important}
-  .view{display:block!important;padding:0}
+  .login,.topbar,.tabbar,.toast,.rbadge,#__buildtag,.vp-menubar,.vp-scrim,#vp-logout-bar,.btn,.chip,.doc-filter,#splash,.spad{display:none!important}
+  .view{display:none!important}
+  .view.on{display:block!important;padding:0}
   body{background:#fff}
   .card,.met,.frow,.erow,.rem-row,.q-row,.doc-row,.litem,.chip,.mbar,.cfrow{box-shadow:none}
 }
@@ -2066,6 +2067,10 @@ body.vp-menu-open .tabbar .tab.on{border-left-color:var(--gold);background:var(-
     <div id="fo-pending-list" style="margin-bottom:10px"></div>
     <button class="btn btn-p" onclick="showPaymentOptions()">💳 Make Payment</button>
   </div>
+  <div class="card">
+    <button class="btn btn-p" onclick="prtFestExpenses()">🖨️ Print Festival Expenses (1–2 pages)</button>
+    <p style="font-size:10.5px;color:var(--muted);margin-top:6px">Prints a clean summary report. Use this instead of the phone's Print option, which would print every app page.</p>
+  </div>
 </div>
 
 <!-- FLAT OWNER: MY FESTIVAL CONTRIBUTIONS -->
@@ -3616,6 +3621,32 @@ function prtFestivalReport(){
       '</table>'):'<p style="font-size:12px;color:var(--muted)">No expenses recorded yet for this festival.</p>');
 
   openPdfWindow('Festival Report - '+fest,body+docSigs(),true);
+}
+function prtFestExpenses(){
+  var fests=(st.festivals||[]),cons=(st.festivalContributions||[]);
+  var names=[];[].concat(fests,cons).forEach(function(x){var n=x.festival||x.festName||x.name||'';if(n&&names.indexOf(n)<0)names.push(n);});names.sort();
+  if(!names.length){showToast('No festival data to print');return;}
+  var sum=function(a,f){return a.filter(f).reduce(function(t,x){return t+(+x.amount||0);},0);};
+  var gc=0,ge=0;
+  var rows=names.map(function(n){var c=sum(cons,function(x){return (x.festival||x.festName||x.name)===n;}),e=sum(fests,function(x){return (x.festival||x.festName||x.name)===n;});gc+=c;ge+=e;var b=c-e;
+    return '<tr><td>'+esc(n)+'</td><td class="g">'+fmt(c)+'</td><td class="r">'+fmt(e)+'</td><td><b class="'+(b>=0?'g':'r')+'">'+(b<0?'-':'')+fmt(Math.abs(b))+'</b></td></tr>';}).join('');
+  var gb=gc-ge;
+  var ex=fests.slice().sort(function(a,b){return (a.ts||0)-(b.ts||0);});
+  var exRows=ex.map(function(e,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(e.festival||'')+'</td><td>'+esc(e.item||'Expense')+'</td><td>'+ddmmyy(e.ts)+'</td><td class="r">'+fmt(e.amount||0)+'</td></tr>';}).join('')||'<tr><td colspan="5" style="text-align:center;color:#6b7280">No expenses recorded</td></tr>';
+  var mine='';
+  if(typeof ownerFlat!=='undefined'&&ownerFlat){
+    var my=cons.filter(function(c){return String(c.flat)===String(ownerFlat);}).sort(function(a,b){return (a.ts||0)-(b.ts||0);});
+    mine='<h2>Your contributions · Flat '+esc(ownerFlat)+'</h2><table><tr><th>Festival</th><th>Date</th><th>Amount</th></tr>'+
+      (my.map(function(c){return '<tr><td>'+esc(c.festival||'')+'</td><td>'+ddmmyy(c.ts)+'</td><td class="g">'+fmt(c.amount||0)+'</td></tr>';}).join('')||'<tr><td colspan="3" style="text-align:center;color:#6b7280">None</td></tr>')+
+      '<tr><td colspan="2"><b>Total</b></td><td class="g"><b>'+fmt(my.reduce(function(t,c){return t+(+c.amount||0);},0))+'</b></td></tr></table>';
+  }
+  var body='<h2 style="margin-top:0">🎊 Festival Expenses Report</h2>'+
+    '<h2>Summary by festival</h2><table><tr><th>Festival</th><th>Collected</th><th>Expenses</th><th>Balance</th></tr>'+rows+
+    '<tr><td><b>Total</b></td><td class="g"><b>'+fmt(gc)+'</b></td><td class="r"><b>'+fmt(ge)+'</b></td><td><b class="'+(gb>=0?'g':'r')+'">'+(gb<0?'-':'')+fmt(Math.abs(gb))+'</b></td></tr></table>'+
+    mine+
+    '<h2>Expense details</h2><table><tr><th>#</th><th>Festival</th><th>Item</th><th>Date</th><th>Amount</th></tr>'+exRows+
+    '<tr><td colspan="4"><b>Total expenses</b></td><td class="r"><b>'+fmt(ge)+'</b></td></tr></table>';
+  openPdfWindow('Festival Expenses Report',body,!isAdmin);
 }
 function distinctFestivalNames(){
   const names=new Set();
