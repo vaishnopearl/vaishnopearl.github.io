@@ -11456,6 +11456,7 @@ function vpCloseMenu(){document.body.classList.remove('vp-menu-open');}
     var r=_orig.apply(this,arguments);
     try{
       var b=btn||document.querySelector('.tabbar:not(.hidden) .tab.on');
+      if(!btn){var m=Array.prototype.slice.call(document.querySelectorAll('.tabbar:not(.hidden) .tab')).find(function(t){return (t.getAttribute('onclick')||'').indexOf("goTab('"+id+"'")===0;});if(m){b=m;m.classList.add('on');}}
       var el=document.getElementById('vp-cur');
       if(el&&b)el.textContent=(b.textContent||'').replace(/\s+/g,' ').trim();
     }catch(e){}
