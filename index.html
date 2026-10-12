@@ -11440,6 +11440,23 @@ function vpFeSave(){
 }
 function vpFeDiscard(){vpFeSt={idx:vpFeCur(),ch:{}};vpFeManualRender();showToast('Changes discarded');}
 function vpFeRefreshAll(){try{loadFlatExpenses();}catch(e){}try{rDash();}catch(e){}try{rFlats();}catch(e){}}
+function vpFeFestRender(idx){
+  var list=document.getElementById('fe-list');if(!list)return;
+  var box=document.getElementById('fe-fest');
+  if(!box){box=document.createElement('div');box.id='fe-fest';list.parentNode.insertBefore(box,list.nextSibling);}
+  var fe=vpFlatEntries(idx).filter(function(e){return e.category!=='Maintenance';});
+  if(!fe.length){box.innerHTML='';return;}
+  var g={};fe.forEach(function(e){var n=e.category.replace(/^Festival\s*/,'')||'Festival';(g[n]=g[n]||[]).push(e);});
+  var grand=fe.reduce(function(a,e){return a+(+e.amount||0);},0);
+  var h='<div class="sec">🎊 Festival Contributions · all dates</div><div class="card">';
+  Object.keys(g).sort().forEach(function(n){
+    var arr=g[n].slice().sort(function(a,b){return a.date.localeCompare(b.date);}),t=arr.reduce(function(a,e){return a+(+e.amount||0);},0);
+    h+='<div style="padding:8px 0;border-bottom:1px solid var(--bdr)"><div style="display:flex;justify-content:space-between;align-items:center"><b>🎊 '+vpFeEsc(n)+'</b><b style="color:var(--ok);font-size:16px">₹'+t.toLocaleString('en-IN')+'</b></div>'+
+      '<div style="font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.6">'+arr.map(function(e){return '₹'+(+e.amount||0).toLocaleString('en-IN')+' · '+ddmmyy(e.date);}).join(' &nbsp;+&nbsp; ')+'</div></div>';
+  });
+  h+='<div style="display:flex;justify-content:space-between;padding-top:10px;font-weight:800"><span>Total festival contributions</span><span style="color:var(--P)">₹'+grand.toLocaleString('en-IN')+'</span></div></div>';
+  box.innerHTML=h;
+}
 function vpFeManualRender(){
   var anchor=document.getElementById('fe-outstanding');if(!anchor)return;
   var card=anchor.closest('.card')||anchor.parentNode,box=document.getElementById('fe-manual');
@@ -11726,6 +11743,7 @@ function loadFlatExpenses(){
       <div class="eam">₹${(+e.amount||0).toLocaleString('en-IN')}</div>
     </div>`).join('');
   document.getElementById('fe-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No entries for this flat in this period</div>';
+  try{vpFeFestRender(idx);}catch(e){console.error(e);}
   try{vpFeManualRender();}catch(e){console.error(e);}
 }
 
