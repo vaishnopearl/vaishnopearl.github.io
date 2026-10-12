@@ -7108,7 +7108,7 @@ function checkUnseenReceipt(){
 }
 function genPin(){let p='';for(let i=0;i<4;i++)p+=Math.floor(Math.random()*10);return p;}
 // ── Access Control (ManasaTech Innovations only) ──────────
-function accessRoleEnabled(role){return (st.accessControl&&st.accessControl.roles&&st.accessControl.roles[role])!==false;}
+function accessRoleEnabled(role){if(role==='manasa')return true;return (st.accessControl&&st.accessControl.roles&&st.accessControl.roles[role])!==false;}
 function accessFlatEnabled(fl){return (st.accessControl&&st.accessControl.flats&&st.accessControl.flats[fl])!==false;}
 function toggleRoleAccess(role){
   if(!isSuper())return;
