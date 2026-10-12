@@ -11261,29 +11261,52 @@ function initFestivalContribAddForm(){
   }
 }
 
+
+/* ── Flat Expenses data (built from the app's real month records) ── */
+function vpMonthsUpto(){return Object.keys(st.months).filter(function(k){return /^\d{4}-\d{2}$/.test(k)&&k<=curKey();}).sort();}
+function vpFlatEntries(idx){
+  var f=FD[idx]; if(!f)return [];
+  var out=[];
+  vpMonthsUpto().forEach(function(k){
+    var fl=(st.months[k].flats||[]);
+    var mf=fl.find(function(x){return x&&String(x.no)===String(f.no);})||fl[idx];
+    if(!mf)return;
+    var pl=mf.paid?vpPayLine(mf):'';
+    out.push({flat:String(idx+1),month:k,category:'Maintenance',amount:vpFlatAmt(mf),paid:!!mf.paid,
+      date:k+'-01',note:mf.paid?('✅ Paid'+(pl?' · '+pl:'')):'⏳ Unpaid'});
+  });
+  (st.festivalContributions||[]).forEach(function(c){
+    if(String(c.flat).replace(/^Flat\s*/i,'')!==String(f.no))return;
+    var d=new Date(c.ts||Date.now()); if(isNaN(d))d=new Date();
+    var mo=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    out.push({flat:String(idx+1),month:mo,category:'Festival '+(c.festival||c.festName||''),amount:+c.amount||0,paid:true,
+      date:mo+'-'+String(d.getDate()).padStart(2,'0'),note:'Festival contribution'});
+  });
+  return out;
+}
+function vpFlatDue(idx){
+  var t=0,p=0;
+  vpFlatEntries(idx).forEach(function(e){if(e.category!=='Maintenance')return;t+=e.amount;if(e.paid)p+=e.amount;});
+  return {total:t,paid:p,due:Math.max(0,t-p)};
+}
+function vpFeEsc(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function vpFeCur(){var s=document.getElementById('fe-flat-select');return (s&&s.value)?parseInt(s.value)-1:-1;}
 function initFlatExpensesTab(){
-  // Populate flat select
   var flatSel = document.getElementById('fe-flat-select');
   if(flatSel){
-    var allFlats = FD||[];
+    var prev=flatSel.value;
     flatSel.innerHTML = '<option value="">— Select Flat —</option>' +
-      allFlats.map((f,i)=>`<option value="${i+1}">Flat ${i+1} ${f.name?'('+f.name+')':''}</option>`).join('');
+      (FD||[]).map((f,i)=>`<option value="${i+1}">Flat ${vpFeEsc(f.no)} ${f.name?'('+vpFeEsc(f.name)+')':''}</option>`).join('');
+    if(prev)flatSel.value=prev;
+    else if(typeof ownerFlat!=='undefined'&&ownerFlat){var oi=FD.findIndex(function(f){return String(f.no)===String(ownerFlat);});if(oi>=0)flatSel.value=String(oi+1);}
   }
-
-  // Populate month select
   var monthSel = document.getElementById('fe-month-select');
   if(monthSel){
-    var months = [];
-    for(var i=11;i>=0;i--){
-      var d = new Date();
-      d.setMonth(d.getMonth()-i);
-      var ym = d.toISOString().slice(0,7);
-      var ml = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      months.push({val:ym,label:ml[d.getMonth()]+' '+d.getFullYear()});
-    }
-    monthSel.innerHTML = months.map(m=>`<option value="${m.val}">${m.label}</option>`).join('');
+    var prevM=monthSel.value, ks=vpMonthsUpto().slice().reverse(), cur=curKey();
+    if(ks.indexOf(cur)<0)ks.unshift(cur);
+    monthSel.innerHTML = '<option value="">All months</option>'+ks.map(k=>`<option value="${k}">${lbl(k)}</option>`).join('');
+    monthSel.value = (prevM!==''&&ks.indexOf(prevM)>=0)?prevM:cur;
   }
-
   loadFlatExpenses();
 }
 
@@ -11463,126 +11486,89 @@ function vpCloseMenu(){document.body.classList.remove('vp-menu-open');}
     if(!vpSilentRefresh){vpCloseMenu();try{window.scrollTo(0,0);}catch(e){}}
     return r;
   };
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')vpCloseMenu();});
+})();
 
 // ═══════════ FLAT OWNER EXPENSES ═══════════
 function loadFlatExpenses(){
-  var flatSel = document.getElementById('fe-flat-select');
   var monthSel = document.getElementById('fe-month-select');
-  var searchVal = (document.getElementById('fe-search')||{}).value||'';
-
-  if(!flatSel||!flatSel.value){
+  var searchVal = ((document.getElementById('fe-search')||{}).value||'').toLowerCase();
+  var idx=vpFeCur();
+  if(idx<0||!FD[idx]){
     document.getElementById('fe-list').innerHTML='<div class="card" style="text-align:center;padding:20px;color:var(--muted)">Please select a flat</div>';
     return;
   }
-
-  var flatNum = flatSel.value;
-  var monthKey = monthSel?monthSel.value:new Date().toISOString().slice(0,7);
-
-  var allExp = (vpState.allExp||[]).filter(e => {
-    var match = searchVal==='' || e.category.toLowerCase().includes(searchVal.toLowerCase()) ||
-                (e.note||'').toLowerCase().includes(searchVal.toLowerCase()) ||
-                e.amount.toString().includes(searchVal);
-    return match && e.flat === flatNum && (!e.month || e.month.includes(monthKey));
+  var monthKey = monthSel?monthSel.value:'';
+  var mine = vpFlatEntries(idx);
+  var allExp = mine.filter(e=>{
+    if(monthKey && e.month!==monthKey) return false;
+    return searchVal==='' || e.category.toLowerCase().includes(searchVal) || (e.note||'').toLowerCase().includes(searchVal) || String(e.amount).includes(searchVal);
   });
-
-  var total = allExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  var total = allExp.reduce((s,e)=>s+(+e.amount||0),0);
   document.getElementById('fe-total-amount').textContent = '₹' + total.toLocaleString('en-IN');
   document.getElementById('fe-entry-count').textContent = allExp.length;
 
-  // Category breakdown
   var byCategory = {};
   allExp.forEach(e=>{
     if(!byCategory[e.category]) byCategory[e.category]={count:0,amount:0};
-    byCategory[e.category].count++;
-    byCategory[e.category].amount += parseFloat(e.amount||0);
+    byCategory[e.category].count++; byCategory[e.category].amount += (+e.amount||0);
   });
-
   var catHtml = '';
   Object.keys(byCategory).sort().forEach(cat=>{
-    catHtml += `<div class="sr"><span class="slb">${cat}</span><span><b>₹${byCategory[cat].amount.toLocaleString('en-IN')}</b> (${byCategory[cat].count})</span></div>`;
+    catHtml += `<div class="sr"><span class="slb">${vpFeEsc(cat)}</span><span><b>₹${byCategory[cat].amount.toLocaleString('en-IN')}</b> (${byCategory[cat].count})</span></div>`;
   });
-  document.getElementById('fe-category-breakdown').innerHTML = catHtml || '<p style="color:var(--muted);font-size:12px">No expenses found</p>';
+  document.getElementById('fe-category-breakdown').innerHTML = catHtml || '<p style="color:var(--muted);font-size:12px">No entries found</p>';
 
-  // Populate YoY category dropdown
-  var uniqueCategories = [];
-  (vpState.allExp||[]).forEach(e=>{
-    if(!uniqueCategories.includes(e.category)) uniqueCategories.push(e.category);
-  });
+  var uniq=[]; mine.forEach(e=>{if(uniq.indexOf(e.category)<0)uniq.push(e.category);});
   var catSel = document.getElementById('fe-yoy-category');
   if(catSel){
-    catSel.innerHTML = '<option value="">— All Categories —</option>' +
-      uniqueCategories.sort().map(c=>`<option value="${c}">${c}</option>`).join('');
+    var pc=catSel.value;
+    catSel.innerHTML = '<option value="">— All Categories —</option>' + uniq.sort().map(c=>`<option value="${vpFeEsc(c)}">${vpFeEsc(c)}</option>`).join('');
+    if(pc&&uniq.indexOf(pc)>=0)catSel.value=pc;
   }
 
-  // Calculate outstanding amount
-  var flatIdx = parseInt(flatNum)-1;
-  var totalDue = 0, totalPaid = 0;
-  var months = (vpState.months||[]);
-  if(!months.length){
-    for(var i=11;i>=0;i--){
-      var d = new Date();
-      d.setMonth(d.getMonth()-i);
-      months.push(d.toISOString().slice(0,7));
-    }
-  }
-  months.forEach(function(mon){
-    var md = gmd(mon);
-    if(md.flats[flatIdx]){
-      totalDue += st.mf||0;
-      if(md.flats[flatIdx].paid) totalPaid += st.mf||0;
-    }
-  });
-
-  (vpState.allExp||[]).forEach(function(e){
-    if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
-  });
-
-  var outstanding = Math.max(0, totalDue - totalPaid);
-  document.getElementById('fe-outstanding').textContent = '₹' + outstanding.toLocaleString('en-IN');
-
-  if(outstanding > 0){
-    document.getElementById('fe-payment-status').textContent = '⏳ Pending ₹' + outstanding.toLocaleString('en-IN');
-    document.getElementById('fe-payment-status').style.background = 'var(--warnB)';
-    document.getElementById('fe-payment-status').style.color = 'var(--warn)';
+  var d = vpFlatDue(idx);
+  document.getElementById('fe-outstanding').textContent = '₹' + d.due.toLocaleString('en-IN');
+  var ps=document.getElementById('fe-payment-status');
+  if(d.due > 0){
+    ps.textContent = '⏳ Pending ₹' + d.due.toLocaleString('en-IN');
+    ps.style.background = 'var(--warnB)'; ps.style.color = 'var(--warn)';
   }else{
-    document.getElementById('fe-payment-status').textContent = '✅ Paid';
-    document.getElementById('fe-payment-status').style.background = 'var(--okB)';
-    document.getElementById('fe-payment-status').style.color = 'var(--ok)';
+    ps.textContent = '✅ Paid';
+    ps.style.background = 'var(--okB)'; ps.style.color = 'var(--ok)';
   }
 
-  // Expense list
-  var listHtml = allExp.map(e=>`
+  var icons={Maintenance:'👷',Festival:'🎊'};
+  var listHtml = allExp.slice().sort((a,b)=>b.month.localeCompare(a.month)).map(e=>`
     <div class="erow">
-      <div class="eic">${{Watchman:'🛡️',Electricity:'⚡',Water:'💧',Internet:'🌐',Lift:'🛗',Electrician:'🔌',Plumber:'🔧',Maintenance:'👷',CCTV:'📷',Motor:'⚙️',Dust:'🧹',Housekeeping:'🧺',Flowers:'🌸',Building:'🏗️',Solar:'☀️',Festival:'🎊',Additional:'➕',Other:'📝'}[e.category.split(' ')[0]]||'📋'}</div>
+      <div class="eic">${icons[e.category.split(' ')[0]]||'📋'}</div>
       <div class="ei">
-        <div class="elb">${e.category}</div>
-        <div class="ect">${new Date(e.date||Date.now()).toLocaleDateString('en-IN')}</div>
-        ${e.note?`<div class="enote">${e.note}</div>`:''}
+        <div class="elb">${vpFeEsc(e.category)}</div>
+        <div class="ect">${e.category==='Maintenance'?lbl(e.month):ddmmyy(e.date)}</div>
+        ${e.note?`<div class="enote">${vpFeEsc(e.note)}</div>`:''}
       </div>
-      <div class="eam">₹${parseFloat(e.amount||0).toLocaleString('en-IN')}</div>
-    </div>
-  `).join('');
-  document.getElementById('fe-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No expenses for this flat in this period</div>';
+      <div class="eam">₹${(+e.amount||0).toLocaleString('en-IN')}</div>
+    </div>`).join('');
+  document.getElementById('fe-list').innerHTML = listHtml || '<div class="card" style="text-align:center;padding:20px;color:var(--muted)">No entries for this flat in this period</div>';
 }
 
 function exportFlatExpensesCSV(){
-  var flatSel = document.getElementById('fe-flat-select');
-  if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
-  var csv = 'Date,Category,Amount,Note\\n';
-  var allExp = (vpState.allExp||[]).filter(e=>e.flat===flatSel.value);
-  allExp.forEach(e=>csv+=(e.date||'')+','+(e.category||'')+','+(e.amount||0)+','+((e.note||'').replace(/,/g,';'))+'\n');
+  var idx=vpFeCur();
+  if(idx<0){alert('Please select a flat');return;}
+  var csv = 'Month,Category,Amount,Status\n';
+  vpFlatEntries(idx).forEach(e=>csv+=e.month+','+(e.category||'').replace(/,/g,';')+','+(e.amount||0)+','+(e.note||'').replace(/,/g,';')+'\n');
   var blob = new Blob([csv],{type:'text/csv'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'Flat_'+flatSel.value+'_Expenses.csv';
+  a.download = 'Flat_'+FD[idx].no+'_Statement.csv';
   a.click();
 }
 
 function sendFlatExpensesWhatsApp(){
   var flatSel = document.getElementById('fe-flat-select');
   if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
-  var msg = 'Expense Statement - Flat '+flatSel.value+': '+document.getElementById('fe-total-amount').textContent+' ('+document.getElementById('fe-entry-count').textContent+' entries)';
+  var msg = 'Statement - Flat '+FD[vpFeCur()].no+' | Outstanding '+document.getElementById('fe-outstanding').textContent+' | Shown: '+document.getElementById('fe-total-amount').textContent+' ('+document.getElementById('fe-entry-count').textContent+' entries)';
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
 }
 
@@ -11601,41 +11587,20 @@ function loadYoYExpenses(){
     return;
   }
 
-  var flatNum = flatSel.value;
   var selectedCat = catSel?catSel.value:'';
 
-  // Get all expenses for this flat
-  var allExp = (vpState.allExp||[]).filter(e=>e.flat===flatNum);
-
-  // Filter by category if selected
-  if(selectedCat){
-    allExp = allExp.filter(e=>e.category===selectedCat);
-  }
-
-  // Group by month
+  var allExp = vpFlatEntries(vpFeCur());
+  if(selectedCat){ allExp = allExp.filter(e=>e.category===selectedCat); }
   var byMonth = {};
-  var currentMonth = new Date().toISOString().slice(0,7);
-
-  // Initialize last 12 months
   for(var i=11;i>=0;i--){
-    var d = new Date();
-    d.setMonth(d.getMonth()-i);
-    var mon = d.toISOString().slice(0,7);
+    var d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-i);
+    var mon = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     byMonth[mon] = {month:mon, amount:0};
   }
-
-  // Aggregate expenses
-  allExp.forEach(e=>{
-    var emon = (e.date||'').slice(0,7);
-    if(byMonth[emon]) byMonth[emon].amount += parseFloat(e.amount||0);
-  });
-
+  allExp.forEach(e=>{ if(byMonth[e.month]) byMonth[e.month].amount += parseFloat(e.amount||0); });
   var months = Object.keys(byMonth).sort();
   var amounts = months.map(m=>byMonth[m].amount);
-  var labels = months.map(m=>{
-    var d = new Date(m+'-01');
-    return d.toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
-  });
+  var labels = months.map(m=>lbl(m).replace(/ 20/,' '));
 
   // Create simple chart HTML
   var maxAmount = Math.max(...amounts, 1);
@@ -11653,7 +11618,7 @@ function loadYoYExpenses(){
   chartHtml += '<div style="margin-top:8px;font-size:11px;color:var(--muted)">Max: ₹'+maxAmount.toLocaleString('en-IN')+'</div>';
 
   if(!allExp.length){
-    chartHtml = '<p style="color:var(--muted);font-size:12px">No expenses found for this category</p>';
+    chartHtml = '<p style="color:var(--muted);font-size:12px">No entries found for this category</p>';
   }
 
   document.getElementById('fe-yoy-chart').innerHTML = chartHtml;
@@ -11663,9 +11628,7 @@ function sendPaymentReminder(){
   var flatSel = document.getElementById('fe-flat-select');
   if(!flatSel||!flatSel.value){alert('Please select a flat');return;}
 
-  var flatNum = flatSel.value;
-  var flatIdx = parseInt(flatNum)-1;
-  var flat = (vpState.flats||FD||[])[flatIdx];
+  var flat = FD[vpFeCur()]; var flatNum = flat.no;
   var phone = flat.phone||'';
 
   var outstanding = document.getElementById('fe-outstanding').textContent;
@@ -11754,39 +11717,14 @@ function vpRefreshFestivalDropdown(){
 // ═══════════ OUTSTANDING AMOUNTS & PAYMENT REMINDERS ═══════════
 function loadOutstandingAmounts(){
   var searchVal = (document.getElementById('os-search')||{}).value||'';
-  var allFlats = vpState.flats||FD||[];
+  var allFlats = FD||[];
 
   // Calculate outstanding for each flat
   var outstanding = [];
   allFlats.forEach(function(flat,idx){
-    var flatNo = idx+1;
-    var flatNum = 'Flat '+flatNo;
-    var totalDue = 0, totalPaid = 0;
-
-    // Calculate maintenance dues
-    var months = (vpState.months||[]);
-    if(!months.length){
-      for(var i=11;i>=0;i--){
-        var d = new Date();
-        d.setMonth(d.getMonth()-i);
-        months.push(d.toISOString().slice(0,7));
-      }
-    }
-
-    months.forEach(function(mon){
-      var md = gmd(mon);
-      if(md.flats[idx]){
-        totalDue += st.mf||0;
-        if(md.flats[idx].paid) totalPaid += st.mf||0;
-      }
-    });
-
-    // Add other expenses specific to flat
-    (vpState.allExp||[]).forEach(function(e){
-      if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
-    });
-
-    var dues = Math.max(0, totalDue - totalPaid);
+    var flatNo = flat.no;
+    var _d = vpFlatDue(idx), totalDue=_d.total, totalPaid=_d.paid;
+    var dues = _d.due;
     if(dues > 0){
       outstanding.push({
         flatNo: flatNo,
@@ -11832,35 +11770,12 @@ function loadOutstandingAmounts(){
 var bulkReminderState = {active:false, flats:[], current:0, type:''};
 function startBulkReminders(type){
   var outstandingFlats = [];
-  var allFlats = vpState.flats||FD||[];
+  var allFlats = FD||[];
 
   allFlats.forEach(function(flat,idx){
-    var flatNo = idx+1;
-    var flatNum = 'Flat '+flatNo;
-    var totalDue = 0, totalPaid = 0;
-
-    var months = (vpState.months||[]);
-    if(!months.length){
-      for(var i=11;i>=0;i--){
-        var d = new Date();
-        d.setMonth(d.getMonth()-i);
-        months.push(d.toISOString().slice(0,7));
-      }
-    }
-
-    months.forEach(function(mon){
-      var md = gmd(mon);
-      if(md.flats[idx]){
-        totalDue += st.mf||0;
-        if(md.flats[idx].paid) totalPaid += st.mf||0;
-      }
-    });
-
-    (vpState.allExp||[]).forEach(function(e){
-      if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
-    });
-
-    var dues = Math.max(0, totalDue - totalPaid);
+    var flatNo = flat.no;
+    var _d = vpFlatDue(idx), totalDue=_d.total, totalPaid=_d.paid;
+    var dues = _d.due;
     if(dues > 0){
       outstandingFlats.push({
         flatNo: flatNo,
@@ -11925,36 +11840,13 @@ function skipReminder(){
 }
 
 function exportOutstandingCSV(){
-  var allFlats = vpState.flats||FD||[];
+  var allFlats = FD||[];
   var csv = 'Flat,Owner,Phone,Outstanding Amount,Total Due,Paid\n';
 
   allFlats.forEach(function(flat,idx){
-    var flatNo = idx+1;
-    var flatNum = 'Flat '+flatNo;
-    var totalDue = 0, totalPaid = 0;
-
-    var months = (vpState.months||[]);
-    if(!months.length){
-      for(var i=11;i>=0;i--){
-        var d = new Date();
-        d.setMonth(d.getMonth()-i);
-        months.push(d.toISOString().slice(0,7));
-      }
-    }
-
-    months.forEach(function(mon){
-      var md = gmd(mon);
-      if(md.flats[idx]){
-        totalDue += st.mf||0;
-        if(md.flats[idx].paid) totalPaid += st.mf||0;
-      }
-    });
-
-    (vpState.allExp||[]).forEach(function(e){
-      if(e.flat === flatNum) totalDue += parseFloat(e.amount||0);
-    });
-
-    var dues = Math.max(0, totalDue - totalPaid);
+    var flatNo = flat.no;
+    var _d = vpFlatDue(idx), totalDue=_d.total, totalPaid=_d.paid;
+    var dues = _d.due;
     if(dues > 0){
       csv += 'Flat '+flatNo+',"'+flat.name+'","'+(flat.phone||'')+'",'+dues+','+totalDue+','+totalPaid+'\n';
     }
@@ -11976,8 +11868,6 @@ function initOutstandingTab(){
   loadOutstandingAmounts();
 }
 
-  document.addEventListener('keydown',function(e){if(e.key==='Escape')vpCloseMenu();});
-})();
 </script>
 <script>
 /* ===== WhatsApp / UPI receipt import (Share-to-app + manual picker) ===== */
