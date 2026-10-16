@@ -1,11 +1,25 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.manasatech.vaishnopearl",
       "sha256_cert_fingerprints": [
         "BF:6B:B6:34:23:F3:3E:47:6E:AE:1A:6E:A9:DA:A0:8E:59:EA:FA:94:56:44:A8:1E:26:22:55:62:CE:DF:48:50"
+      ]
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.manasatech.vaishnopearl.maintenancetracker",
+      "sha256_cert_fingerprints": [
+        "65:A9:1C:A0:55:E9:00:CA:B9:B4:B9:8C:01:B8:1F:74:13:CA:EA:B7:AF:93:44:D5:4D:A9:B4:67:90:10:39:EB"
       ]
     }
   }
