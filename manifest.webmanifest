@@ -13,9 +13,22 @@
     "action": "./share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
-    "params": { "files": [ { "name": "receipts", "accept": ["image/*"] } ] }
+    "params": {
+      "files": [
+        {
+          "name": "receipts",
+          "accept": [
+            "image/*"
+          ]
+        }
+      ]
+    }
   },
-  "categories": ["productivity", "utilities", "finance"],
+  "categories": [
+    "productivity",
+    "utilities",
+    "finance"
+  ],
   "icons": [
     {
       "src": "icon-192.png",
@@ -38,6 +51,18 @@
     {
       "src": "icon-512-maskable.png",
       "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-1024-clean.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-1024-maskable-clean.png",
+      "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "maskable"
     }
